@@ -20,9 +20,10 @@ program
   .option("-r, --root <dir>", "repo root to scan", ".")
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.root);
+    const outPath = path.resolve(repoRoot, opts.out);
     const content = await generateServiceMd(repoRoot);
-    await writeFile(path.join(repoRoot, opts.out), content, "utf8");
-    console.log(`[handoverkit] wrote ${opts.out}`);
+    await writeFile(outPath, content, "utf8");
+    console.log(`[handoverkit] wrote ${path.relative(process.cwd(), outPath) || outPath}`);
   });
 
 program
@@ -47,7 +48,13 @@ program
 
     if (opts.postComment) {
       const provider = await getProvider();
-      await provider.postComment({}, report);
+      try {
+        await provider.postComment({}, report);
+      } catch (err) {
+        // A comment we couldn't post shouldn't mask the drift verdict itself —
+        // that verdict is the reason the job runs. Warn and let --ci decide.
+        console.warn(`[handoverkit] could not post comment: ${errorMessage(err)}`);
+      }
     }
 
     const anyStale = results.some((r) => r.stale);
@@ -56,4 +63,13 @@ program
     }
   });
 
-program.parseAsync(process.argv);
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+program.parseAsync(process.argv).catch((err) => {
+  // Without this, any rejection surfaces as an unhandled-rejection stack trace
+  // and (on Node 18+) a non-descript crash rather than a readable CI failure.
+  console.error(`[handoverkit] ${errorMessage(err)}`);
+  process.exit(1);
+});

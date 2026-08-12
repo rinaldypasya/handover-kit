@@ -1,38 +1,65 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { tryRead } from "./fsUtil.js";
+import { toPosix } from "./walk.js";
 
-export interface CiInfo {
-  kind: "github-actions" | "gitlab-ci" | "none";
+export type CiKind = "github-actions" | "gitlab-ci";
+
+export interface CiSystem {
+  kind: CiKind;
+  label: string;
   files: string[];
 }
 
+export interface CiInfo {
+  /** Every CI system found, not just the first — repos commonly run both. */
+  systems: CiSystem[];
+  /** Flattened, sorted list of every detected pipeline file. */
+  files: string[];
+}
+
+/** Paths worth hashing even when nothing is found, so *adding* CI later registers as drift. */
+export const CI_FALLBACK_SOURCES = [".gitlab-ci.yml", ".github/workflows"];
+
 export async function detectCi(repoRoot: string): Promise<CiInfo> {
+  const systems: CiSystem[] = [];
+
+  const workflows = await listWorkflowFiles(repoRoot);
+  if (workflows.length > 0) {
+    systems.push({ kind: "github-actions", label: "GitHub Actions", files: workflows });
+  }
+
   const gitlabCi = await tryRead(repoRoot, ".gitlab-ci.yml");
   if (gitlabCi !== undefined) {
-    return { kind: "gitlab-ci", files: [".gitlab-ci.yml"] };
+    systems.push({ kind: "gitlab-ci", label: "GitLab CI", files: [".gitlab-ci.yml"] });
   }
 
+  const files = systems.flatMap((s) => s.files).sort();
+  return { systems, files };
+}
+
+async function listWorkflowFiles(repoRoot: string): Promise<string[]> {
   try {
-    const workflowsDir = path.join(repoRoot, ".github", "workflows");
+    const workflowsDir = path.resolve(repoRoot, ".github", "workflows");
     const entries = await readdir(workflowsDir);
-    const ymlFiles = entries.filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"));
-    if (ymlFiles.length > 0) {
-      return {
-        kind: "github-actions",
-        files: ymlFiles.map((f) => path.join(".github", "workflows", f)),
-      };
-    }
+    return entries
+      .filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))
+      .sort()
+      .map((f) => toPosix(path.join(".github", "workflows", f)));
   } catch {
-    // no .github/workflows directory, fall through
+    return [];
   }
+}
 
-  return { kind: "none", files: [] };
+export interface TodoMarker {
+  file: string;
+  line: number;
+  text: string;
 }
 
 /** Finds TODO/FIXME markers in a small set of source files (best-effort, not a full repo scan). */
-export async function findTodos(repoRoot: string, files: string[]): Promise<{ file: string; line: number; text: string }[]> {
-  const results: { file: string; line: number; text: string }[] = [];
+export async function findTodos(repoRoot: string, files: string[]): Promise<TodoMarker[]> {
+  const results: TodoMarker[] = [];
   for (const file of files) {
     const content = await tryRead(repoRoot, file);
     if (!content) continue;

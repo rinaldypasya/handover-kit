@@ -1,4 +1,5 @@
 import type { VcsProvider, PrContext, Issue } from "./VcsProvider.js";
+import { REPORT_MARKER } from "../marker.js";
 
 /**
  * GitLab implementation of the same VcsProvider contract as GithubProvider.
@@ -34,9 +35,14 @@ export class GitlabProvider implements VcsProvider {
       console.warn("[handoverkit] GITLAB_TOKEN or CI_PROJECT_ID missing, skipping comment.");
       return;
     }
-    const url = `${this.apiBase}/projects/${this.projectId}/merge_requests/${mrIid}/notes`;
-    const res = await fetch(url, {
-      method: "POST",
+
+    // Same reasoning as GithubProvider: edit the previous note instead of
+    // stacking a new one on every pipeline run.
+    const notesBase = `${this.apiBase}/projects/${encodeURIComponent(this.projectId)}/merge_requests/${mrIid}/notes`;
+    const existingId = await this.findExistingNoteId(notesBase);
+
+    const res = await fetch(existingId ? `${notesBase}/${existingId}` : notesBase, {
+      method: existingId ? "PUT" : "POST",
       headers: this.headers(),
       body: JSON.stringify({ body }),
     });
@@ -48,7 +54,7 @@ export class GitlabProvider implements VcsProvider {
   async getOpenIssues(labels: string[] = []): Promise<Issue[]> {
     if (!this.token || !this.projectId) return [];
     const labelParam = labels.length ? `&labels=${encodeURIComponent(labels.join(","))}` : "";
-    const url = `${this.apiBase}/projects/${this.projectId}/issues?state=opened${labelParam}`;
+    const url = `${this.apiBase}/projects/${encodeURIComponent(this.projectId)}/issues?state=opened&per_page=100${labelParam}`;
     const res = await fetch(url, { headers: this.headers() });
     if (!res.ok) return [];
     const data = (await res.json()) as any[];
@@ -57,5 +63,19 @@ export class GitlabProvider implements VcsProvider {
       url: i.web_url as string,
       labels: i.labels ?? [],
     }));
+  }
+
+  private async findExistingNoteId(notesBase: string): Promise<number | undefined> {
+    try {
+      const res = await fetch(`${notesBase}?per_page=100`, { headers: this.headers() });
+      if (!res.ok) return undefined;
+      const notes = (await res.json()) as any[];
+      const mine = notes.filter(
+        (n) => !n.system && typeof n.body === "string" && n.body.includes(REPORT_MARKER)
+      );
+      return mine.at(-1)?.id;
+    } catch {
+      return undefined;
+    }
   }
 }

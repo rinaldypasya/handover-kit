@@ -1,10 +1,27 @@
-handover-check:
+stages:
+  - test
+  - handover
+
+test:
   stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm run typecheck
+    - npm test
+    - npm run build
+
+handover-check:
+  stage: handover
   image: node:20
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  # This repo dogfoods itself, so it runs from source. In your own service,
+  # replace the script below with:
+  #   - npx handover-kit check --ci --post-comment
   script:
-    - npm install -g handover-kit
-    - handoverkit check --ci --post-comment
+    - npm ci
+    - npm run build
+    - node dist/cli.js check --ci --post-comment
   variables:
     GITLAB_TOKEN: $HANDOVERKIT_GITLAB_TOKEN # set as a masked CI/CD variable with `api` scope

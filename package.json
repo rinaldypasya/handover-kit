@@ -4,19 +4,43 @@
   "description": "Keep service documentation alive across handovers: generate a living SERVICE.md and flag it when code changes but the docs don't.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rinaldypasya/handover-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rinaldypasya/handover-kit/issues"
+  },
+  "homepage": "https://github.com/rinaldypasya/handover-kit#readme",
+  "keywords": [
+    "documentation",
+    "handover",
+    "drift",
+    "service-catalog",
+    "ci",
+    "github-actions",
+    "gitlab-ci"
+  ],
   "bin": {
     "handoverkit": "./dist/cli.js"
   },
   "main": "./dist/cli.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "node --import tsx --test tests/*.test.ts",
     "dev": "tsx src/cli.ts",
     "generate": "tsx src/cli.ts generate",
-    "check": "tsx src/cli.ts check"
+    "check": "tsx src/cli.ts check",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "commander": "^12.1.0",
-    "simple-git": "^3.25.0"
+    "commander": "^12.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

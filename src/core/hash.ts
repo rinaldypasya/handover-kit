@@ -15,7 +15,7 @@ export async function hashFiles(repoRoot: string, relativePaths: string[]): Prom
   const hash = createHash("sha256");
   // Sort so hash is independent of the order sources were listed in.
   for (const rel of [...relativePaths].sort()) {
-    const abs = path.join(repoRoot, rel);
+    const abs = path.resolve(repoRoot, rel);
     hash.update(rel);
     try {
       const contents = await readFile(abs);

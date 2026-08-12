@@ -2,20 +2,48 @@ name: handover-kit check
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
-  issues: write # needed to post the drift comment on the PR
+  pull-requests: write # needed to post the drift comment on the PR
+
+concurrency:
+  group: handover-check-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install -g handover-kit
-      - run: handoverkit check --ci --post-comment
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  check:
+    needs: test
+    runs-on: ubuntu-latest
+    # Forked PRs get a read-only token, so the comment step can't work there.
+    # Still worth running the check itself for the exit code.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # This repo dogfoods itself, so it runs from source rather than
+      # `npm install -g handover-kit`. In your own service, replace the two
+      # steps below with:
+      #   - run: npx handover-kit check --ci --post-comment
+      - run: npm run build
+      - run: node dist/cli.js check --ci --post-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

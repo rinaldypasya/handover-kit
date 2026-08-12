@@ -8,17 +8,25 @@ matching doc section doesn't, it flags the PR/MR instead of letting the
 doc quietly go stale.
 
 It's built provider-agnostic from the start: the core engine only touches
-the local filesystem and git history, and platform-specific behavior
-(posting a PR/MR comment, reading open issues) goes through a small
-`VcsProvider` interface. GitHub and GitLab are implemented; adding another
-platform means implementing one interface, not forking the tool.
+the local filesystem, and platform-specific behavior (posting a PR/MR
+comment, reading open issues) goes through a small `VcsProvider` interface.
+GitHub and GitLab are implemented; adding another platform means
+implementing one interface, not forking the tool.
 
 ## Quick start
 
 ```bash
 npm install
 npm run generate   # writes SERVICE.md at the repo root
-npm run check       # compares SERVICE.md against its sources, reports drift
+npm run check      # compares SERVICE.md against its sources, reports drift
+```
+
+Development:
+
+```bash
+npm test        # node:test suite — no extra test runner dependency
+npm run typecheck
+npm run build
 ```
 
 ## How drift detection works
@@ -38,16 +46,24 @@ compares it to what's stored. If they differ, that section is stale. This
 is deliberately not LLM-based — it's a plain hash comparison, so there are
 no false positives from a model "deciding" something looks fine.
 
+A missing file hashes to a fixed sentinel rather than being skipped, so
+"the file used to exist and now doesn't" also counts as drift. Paths are
+normalised to `/` and directory walks are explicitly sorted, so a hash
+generated on one machine matches the one recomputed in CI.
+
 Run it in CI with `--ci` (non-zero exit on drift, useful as a required
 check) and `--post-comment` (posts the report on the PR/MR via whichever
 `VcsProvider` matches the CI environment — see `.github/workflows/handover-check.yml`
-and `.gitlab-ci.yml` for working examples).
+and `.gitlab-ci.yml` for working examples). The comment carries a hidden
+marker, so repeat runs edit the existing comment instead of stacking a new
+one on every push.
 
 ## Project layout
 
 ```
 src/
   cli.ts                 entry point (generate / check commands)
+  marker.ts              the marker embedded in reports, so comments update in place
   core/
     generate.ts           builds SERVICE.md from sections
     check.ts               parses SERVICE.md, recomputes hashes, reports drift
@@ -58,6 +74,7 @@ src/
     VcsProvider.ts          the interface + getProvider() auto-detection
     GithubProvider.ts        posts PR comments / reads issues via GitHub REST API
     GitlabProvider.ts        same contract, via GitLab REST API
+tests/                    node:test suite covering hashing, parsers, and generate→check round-trips
 ```
 
 ## Adding a new platform (e.g. Bitbucket)
@@ -75,13 +92,17 @@ in `core/` needs to change — that's the point of the interface boundary.
   freeform "notes" part that survives regeneration is the next priority.
 - The "Architecture" / dependency-graph section from the original design
   isn't in this MVP yet — `sections.ts` is the place to add it.
-- `Known Issues` only scans TODO/FIXME in source files, capped at 500 files
+- `Known Issues` only scans TODO/FIXME in source files, capped at 200 files
   for speed on large repos; it doesn't yet pull from GitHub/GitLab issues
   even though `VcsProvider.getOpenIssues()` already supports it — wiring
   that in is a good first contribution.
-- No test suite yet. Given the hashing logic is the trust-critical part of
-  this tool, that's the first thing to add.
+- The Deployment section hashes the CI files it found. If a repo had *no*
+  CI and someone adds `.github/workflows/deploy.yml`, that specific case
+  isn't detected as drift (a new `.gitlab-ci.yml` is). Hashing a directory
+  listing rather than a fixed path list would close the gap.
+- Adding or removing any scanned source file changes the Known Issues hash,
+  so that section goes stale more eagerly than the others.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
