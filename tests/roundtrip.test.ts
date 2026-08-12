@@ -76,7 +76,7 @@ test("the generated header is a single well-formed HTML comment", async () => {
     // HTML comments don't nest: everything the header means to say has to sit
     // before the first "-->", or it leaks into the rendered document.
     const header = content.slice(0, content.indexOf("-->"));
-    assert.ok(header.includes("Freely edit the prose"), "header text must not leak past its closing tag");
+    assert.ok(header.includes("carried over untouched"), "header text must not leak past its closing tag");
   });
 });
 

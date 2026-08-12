@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateServiceMd } from "./core/generate.js";
 import { checkServiceMd, formatDriftReport } from "./core/check.js";
+import { countHandWrittenNotes } from "./core/notes.js";
 import { tryRead } from "./core/parsers/fsUtil.js";
 import { getProvider } from "./providers/VcsProvider.js";
 
@@ -21,9 +22,18 @@ program
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.root);
     const outPath = path.resolve(repoRoot, opts.out);
-    const content = await generateServiceMd(repoRoot);
+    // Read the file we're about to overwrite first: that's what carries the
+    // hand-written notes blocks forward. countHandWrittenNotes runs before the
+    // write so a malformed block aborts the command instead of eating prose.
+    const previous = await tryRead(repoRoot, opts.out);
+    const carried = previous ? countHandWrittenNotes(previous) : 0;
+
+    const content = await generateServiceMd(repoRoot, { previous });
     await writeFile(outPath, content, "utf8");
-    console.log(`[handoverkit] wrote ${path.relative(process.cwd(), outPath) || outPath}`);
+
+    const where = path.relative(process.cwd(), outPath) || outPath;
+    const suffix = carried > 0 ? ` (kept ${carried} hand-written notes block${carried === 1 ? "" : "s"})` : "";
+    console.log(`[handoverkit] wrote ${where}${suffix}`);
   });
 
 program

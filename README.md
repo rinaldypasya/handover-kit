@@ -58,6 +58,41 @@ and `.gitlab-ci.yml` for working examples). The comment carries a hidden
 marker, so repeat runs edit the existing comment instead of stacking a new
 one on every push.
 
+## Hand-written notes survive regeneration
+
+Everything a section renders is derived from source files, so `generate`
+rewrites it on every run. The things that make a handover actually useful —
+why the connection pool is capped, who to call at 3am, which migration is
+load-bearing — aren't recoverable from the filesystem, so they get a
+protected block instead:
+
+```markdown
+## Environment & Config
+<!-- handoverkit:id=environment hash=3f9a21c40b1e sources=.env.example -->
+| Variable | Default | Notes |
+...
+
+<!-- handoverkit:notes:start id=environment -->
+Postgres runs on the shared cluster — ask #infra before touching the pool size.
+<!-- handoverkit:notes:end id=environment -->
+```
+
+`generate` reads the file it's about to overwrite and copies each block
+across verbatim. Write plain markdown in there; it's yours.
+
+Notes are not part of the hash — the hash tracks source files, so editing
+your own prose never marks a section as drifted.
+
+Two rules keep this from losing text:
+
+- The closing marker must repeat the same `id`. Otherwise a block missing
+  its end tag would silently swallow the next section.
+- If a block is opened and never closed, `generate` aborts with an error
+  instead of guessing where your prose ended.
+
+Notes whose section no longer exists (a renamed id, an edited `sections.ts`)
+are parked under an `Unfiled Notes` heading rather than dropped.
+
 ## Project layout
 
 ```
@@ -66,6 +101,7 @@ src/
   marker.ts              the marker embedded in reports, so comments update in place
   core/
     generate.ts           builds SERVICE.md from sections
+    notes.ts               carries hand-written notes blocks across regeneration
     check.ts               parses SERVICE.md, recomputes hashes, reports drift
     hash.ts                 the hashing primitive shared by both
     sections.ts              defines each SERVICE.md section + its source files
@@ -86,10 +122,8 @@ in `core/` needs to change — that's the point of the interface boundary.
 
 ## Known limitations (MVP, contributions welcome)
 
-- `generate` currently rewrites the whole file. If you hand-edit the prose
-  in a section beyond what was generated, re-running `generate` will
-  overwrite it. Splitting sections into an auto-generated part and a
-  freeform "notes" part that survives regeneration is the next priority.
+- Prose is only protected inside a notes block. Text you type into the
+  generated half of a section is still overwritten on the next run.
 - The "Architecture" / dependency-graph section from the original design
   isn't in this MVP yet — `sections.ts` is the place to add it.
 - `Known Issues` only scans TODO/FIXME in source files, capped at 200 files

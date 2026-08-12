@@ -1,5 +1,6 @@
 import { buildSections } from "./sections.js";
 import { hashFiles } from "./hash.js";
+import { extractNotes, isEmptyNotes, renderNotesBlock } from "./notes.js";
 
 // NB: HTML comments don't nest — the first "-->" closes the block. So this
 // header must never contain a literal example of a handoverkit comment, or
@@ -9,24 +10,66 @@ const HEADER = `<!--
   Do not remove the "handoverkit:" HTML comments below each heading — they
   store a hash of the files each section was derived from, which is how
   \`handoverkit check\` knows a section has gone stale.
-  Freely edit the prose; the hash only tracks the *source files*, not your
-  edits to this document.
+  Everything a section generates is rewritten on every run. Text you write
+  inside a "handoverkit:notes" block is yours and is carried over untouched.
 -->
 `;
 
-export async function generateServiceMd(repoRoot: string): Promise<string> {
+export interface GenerateOptions {
+  /**
+   * The current contents of the file being regenerated. Supplying it is what
+   * lets hand-written notes blocks survive; omitting it produces a document
+   * with empty notes blocks, which will silently discard existing prose if
+   * you then overwrite a real SERVICE.md with the result.
+   */
+  previous?: string;
+}
+
+export async function generateServiceMd(repoRoot: string, options: GenerateOptions = {}): Promise<string> {
   const sections = await buildSections(repoRoot);
+  // Throws on a half-open block — better to fail before writing than to
+  // regenerate over prose we couldn't reliably find the end of.
+  const carried = options.previous ? extractNotes(options.previous) : new Map<string, string>();
+
   const blocks: string[] = [HEADER, "# Service Handover Doc\n"];
 
   for (const section of sections) {
     const content = await section.render();
     const hash = await hashFiles(repoRoot, section.sourceFiles);
+    const notes = carried.get(section.id) ?? "";
+    carried.delete(section.id);
+
     blocks.push(
       `## ${section.title}\n` +
         `<!-- handoverkit:id=${section.id} hash=${hash} sources=${section.sourceFiles.join(",")} -->\n` +
-        `${content}\n`
+        `${content}\n\n` +
+        `${renderNotesBlock(section.id, notes)}\n`
     );
   }
 
+  const orphans = [...carried].filter(([, body]) => !isEmptyNotes(body));
+  if (orphans.length > 0) {
+    blocks.push(renderUnfiledNotes(orphans));
+  }
+
   return blocks.join("\n");
+}
+
+/**
+ * Notes whose section no longer exists — someone renamed a section id, or
+ * edited sections.ts. Parking them under a heading keeps `generate` lossless;
+ * dropping them would be the exact failure this whole mechanism exists to
+ * prevent. Sorted so regenerating an unchanged repo stays byte-identical.
+ */
+function renderUnfiledNotes(orphans: [string, string][]): string {
+  const lines = [
+    "## Unfiled Notes",
+    "",
+    "_These notes were written against sections that no longer exist. Move them somewhere useful and delete this heading — handover-kit parks them here rather than discarding hand-written text._",
+    "",
+  ];
+  for (const [id, body] of [...orphans].sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(renderNotesBlock(id, body), "");
+  }
+  return lines.join("\n").trimEnd() + "\n";
 }
