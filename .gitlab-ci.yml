@@ -1,0 +1,10 @@
+handover-check:
+  stage: test
+  image: node:20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - npm install -g handover-kit
+    - handoverkit check --ci --post-comment
+  variables:
+    GITLAB_TOKEN: $HANDOVERKIT_GITLAB_TOKEN # set as a masked CI/CD variable with `api` scope

@@ -1,0 +1,59 @@
+#!/usr/bin/env node
+import { Command } from "commander";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { generateServiceMd } from "./core/generate.js";
+import { checkServiceMd, formatDriftReport } from "./core/check.js";
+import { tryRead } from "./core/parsers/fsUtil.js";
+import { getProvider } from "./providers/VcsProvider.js";
+
+const program = new Command();
+
+program
+  .name("handoverkit")
+  .description("Generate and verify a living SERVICE.md so service handovers don't start from zero.");
+
+program
+  .command("generate")
+  .description("Scan the repo and (re)write SERVICE.md")
+  .option("-o, --out <file>", "output file", "SERVICE.md")
+  .option("-r, --root <dir>", "repo root to scan", ".")
+  .action(async (opts) => {
+    const repoRoot = path.resolve(opts.root);
+    const content = await generateServiceMd(repoRoot);
+    await writeFile(path.join(repoRoot, opts.out), content, "utf8");
+    console.log(`[handoverkit] wrote ${opts.out}`);
+  });
+
+program
+  .command("check")
+  .description("Compare SERVICE.md against its source files and report drift")
+  .option("-f, --file <file>", "SERVICE.md path", "SERVICE.md")
+  .option("-r, --root <dir>", "repo root to scan", ".")
+  .option("--ci", "exit with code 1 if any section is stale (for CI gating)", false)
+  .option("--post-comment", "post the drift report as a PR/MR comment", false)
+  .action(async (opts) => {
+    const repoRoot = path.resolve(opts.root);
+    const content = await tryRead(repoRoot, opts.file);
+    if (content === undefined) {
+      console.error(`[handoverkit] ${opts.file} not found. Run \`handoverkit generate\` first.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const results = await checkServiceMd(repoRoot, content);
+    const report = formatDriftReport(results);
+    console.log(report);
+
+    if (opts.postComment) {
+      const provider = await getProvider();
+      await provider.postComment({}, report);
+    }
+
+    const anyStale = results.some((r) => r.stale);
+    if (opts.ci && anyStale) {
+      process.exitCode = 1;
+    }
+  });
+
+program.parseAsync(process.argv);
