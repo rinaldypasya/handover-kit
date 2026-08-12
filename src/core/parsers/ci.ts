@@ -18,8 +18,15 @@ export interface CiInfo {
   files: string[];
 }
 
-/** Paths worth hashing even when nothing is found, so *adding* CI later registers as drift. */
-export const CI_FALLBACK_SOURCES = [".gitlab-ci.yml", ".github/workflows"];
+/**
+ * Always hashed by the Deployment section, whether or not anything was found.
+ *
+ * `.github/workflows` is the directory, not a file: hashFiles fingerprints a
+ * directory by its entry names, so adding the repo's first workflow — or a
+ * second one — changes the hash. Recording only the files that happened to
+ * exist at generate time is what let new pipelines slip in undetected.
+ */
+export const CI_SOURCE_ROOTS = [".gitlab-ci.yml", ".github/workflows"];
 
 export async function detectCi(repoRoot: string): Promise<CiInfo> {
   const systems: CiSystem[] = [];

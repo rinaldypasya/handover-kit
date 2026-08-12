@@ -65,9 +65,12 @@ test("hashing no sources is stable and does not throw", async () => {
   });
 });
 
-test("a directory listed as a source hashes as missing rather than throwing", async () => {
+test("a path that doesn't exist yields a hash rather than throwing", async () => {
   await withTempRepo(async (root) => {
     const hash = await hashFiles(root, [".github/workflows"]);
     assert.match(hash, /^[0-9a-f]{12}$/);
   });
 });
+
+// Directories hash their listing rather than a missing sentinel; see
+// tests/deployment.test.ts for what that buys.

@@ -51,6 +51,11 @@ A missing file hashes to a fixed sentinel rather than being skipped, so
 normalised to `/` and directory walks are explicitly sorted, so a hash
 generated on one machine matches the one recomputed in CI.
 
+A source can also be a **directory**, in which case its sorted entry names
+are hashed. That's how a section notices a file it never knew about:
+`Deployment` records `.github/workflows` itself, so adding a repo's first
+pipeline — or a second one — is drift, not silence.
+
 Run it in CI with `--ci` (non-zero exit on drift, useful as a required
 check) and `--post-comment` (posts the report on the PR/MR via whichever
 `VcsProvider` matches the CI environment — see `.github/workflows/handover-check.yml`
@@ -177,12 +182,8 @@ in `core/` needs to change — that's the point of the interface boundary.
 - Issues pulled with `--with-issues` are a snapshot. They're written into the
   doc but not hashed, so the doc can describe a closed ticket until someone
   regenerates.
-- The Deployment section hashes the CI files it found. If a repo had *no*
-  CI and someone adds `.github/workflows/deploy.yml`, that specific case
-  isn't detected as drift (a new `.gitlab-ci.yml` is). Hashing a directory
-  listing rather than a fixed path list would close the gap.
-- Adding or removing any scanned source file changes the Known Issues hash,
-  so that section goes stale more eagerly than the others.
+- Adding or removing any scanned source file changes the Known Issues and
+  Architecture hashes, so those sections go stale more eagerly than the rest.
 
 ## License
 

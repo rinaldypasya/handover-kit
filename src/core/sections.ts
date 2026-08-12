@@ -1,7 +1,7 @@
 import { loadEnvVars, ENV_FILE_CANDIDATES } from "./parsers/env.js";
 import { loadPackageInfo } from "./parsers/packageJson.js";
 import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
-import { detectCi, findTodos, CI_FALLBACK_SOURCES, type TodoMarker } from "./parsers/ci.js";
+import { detectCi, findTodos, CI_SOURCE_ROOTS, type TodoMarker } from "./parsers/ci.js";
 import { listSourceFiles } from "./parsers/walk.js";
 import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
@@ -147,7 +147,10 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   sections.push({
     id: "deployment",
     title: "Deployment",
-    sourceFiles: ci.files.length > 0 ? ci.files : CI_FALLBACK_SOURCES,
+    // The roots are always included, not used as a fallback: hashing the
+    // workflows *directory* alongside whichever files exist today is what makes
+    // "a pipeline was added" detectable at all.
+    sourceFiles: [...new Set([...CI_SOURCE_ROOTS, ...ci.files])].sort(),
     render: async () => {
       if (ci.systems.length === 0) {
         return "_No CI config detected (.github/workflows or .gitlab-ci.yml). Document the deployment process manually here._";
