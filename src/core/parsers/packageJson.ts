@@ -5,6 +5,7 @@ export interface PackageInfo {
   description?: string;
   scripts: Record<string, string>;
   dependencies: string[];
+  devDependencies: string[];
 }
 
 export async function loadPackageInfo(repoRoot: string): Promise<PackageInfo | undefined> {
@@ -17,6 +18,7 @@ export async function loadPackageInfo(repoRoot: string): Promise<PackageInfo | u
       description: pkg.description,
       scripts: pkg.scripts ?? {},
       dependencies: Object.keys(pkg.dependencies ?? {}),
+      devDependencies: Object.keys(pkg.devDependencies ?? {}),
     };
   } catch {
     return undefined;

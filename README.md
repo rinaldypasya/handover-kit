@@ -58,6 +58,26 @@ and `.gitlab-ci.yml` for working examples). The comment carries a hidden
 marker, so repeat runs edit the existing comment instead of stacking a new
 one on every push.
 
+## The Architecture section
+
+`Architecture` answers "what talks to what" by grouping scanned files per
+directory and deriving edges from their relative imports:
+
+```markdown
+| Directory | Files | Imports from |
+| --- | --- | --- |
+| `src` | 2 | `src/core`, `src/providers` |
+| `src/core` | 5 | `src/core/parsers` |
+| `src/core/parsers` | 7 | _(nothing internal)_ |
+```
+
+Directory granularity is deliberate — a per-file graph of a real service is
+unreadable, and a handover needs the shape, not the wiring. Imports within one
+directory aren't edges, so the table shows coupling rather than cohesion.
+
+Because it's derived from the same scanned files the hash covers, deleting a
+dependency edge shows up as drift on this section.
+
 ## Pulling in open issues
 
 `Known Issues` lists TODO/FIXME markers found in source. It can also list
@@ -128,7 +148,7 @@ src/
     check.ts               parses SERVICE.md, recomputes hashes, reports drift
     hash.ts                 the hashing primitive shared by both
     sections.ts              defines each SERVICE.md section + its source files
-    parsers/                 small, focused readers: env vars, package.json, CODEOWNERS, CI config, TODOs
+    parsers/                 small, focused readers: env vars, package.json, CODEOWNERS, CI config, TODOs, imports
   providers/
     VcsProvider.ts          the interface + getProvider() auto-detection
     GithubProvider.ts        posts PR comments / reads issues via GitHub REST API
@@ -147,8 +167,11 @@ in `core/` needs to change — that's the point of the interface boundary.
 
 - Prose is only protected inside a notes block. Text you type into the
   generated half of a section is still overwritten on the next run.
-- The "Architecture" / dependency-graph section from the original design
-  isn't in this MVP yet — `sections.ts` is the place to add it.
+- `Architecture` reads imports with regexes rather than a parser, so a
+  specifier sitting inside a string or comment counts as an import. Package
+  names are cross-checked against `package.json` to keep that out of the
+  output, which means a package imported but never declared won't be listed.
+  Non-JavaScript files are counted but not parsed for imports.
 - `Known Issues` scans TODO/FIXME in at most 200 source files, for speed on
   large repos.
 - Issues pulled with `--with-issues` are a snapshot. They're written into the

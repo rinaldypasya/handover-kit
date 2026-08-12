@@ -3,6 +3,7 @@ import { loadPackageInfo } from "./parsers/packageJson.js";
 import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
 import { detectCi, findTodos, CI_FALLBACK_SOURCES, type TodoMarker } from "./parsers/ci.js";
 import { listSourceFiles } from "./parsers/walk.js";
+import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
 
 export interface Section {
@@ -61,6 +62,10 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   const owners = await loadCodeowners(repoRoot);
   const scannedFiles = (await listSourceFiles(repoRoot, TODO_SCAN_LIMIT)).slice(0, TODO_SCAN_LIMIT);
   const todos = await findTodos(repoRoot, scannedFiles);
+  // Only filter against package.json when there is one; a repo without it gives
+  // us nothing to verify against, and an unfiltered list beats an empty one.
+  const declaredPackages = pkg ? [...pkg.dependencies, ...pkg.devDependencies] : undefined;
+  const graph = await buildModuleGraph(repoRoot, scannedFiles, declaredPackages);
 
   const sections: Section[] = [];
 
@@ -75,6 +80,33 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
         extractFirstParagraph(readme) ??
         "_No description found in README.md or package.json._";
       return `**${name}**\n\n${desc}`;
+    },
+  });
+
+  sections.push({
+    id: "architecture",
+    title: "Architecture",
+    sourceFiles: scannedFiles,
+    render: async () => {
+      if (graph.modules.length === 0) {
+        return "_No source files were scanned, so there's nothing to map here._";
+      }
+      const rows = graph.modules.map((m) => {
+        const deps = m.dependsOn.length > 0 ? m.dependsOn.map((d) => `\`${d}\``).join(", ") : "_(nothing internal)_";
+        return `| \`${m.dir}\` | ${m.fileCount} | ${deps} |`;
+      });
+      const table = ["| Directory | Files | Imports from |", "| --- | --- | --- |", ...rows].join("\n");
+
+      const parts = [table];
+      if (graph.packages.length > 0) {
+        parts.push(`External packages imported: ${graph.packages.map((p) => `\`${p}\``).join(", ")}.`);
+      }
+      if (graph.unparsedCount > 0) {
+        parts.push(
+          `_${graph.unparsedCount} scanned file(s) aren't JavaScript/TypeScript and weren't parsed for imports._`
+        );
+      }
+      return parts.join("\n\n");
     },
   });
 
