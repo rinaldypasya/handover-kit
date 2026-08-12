@@ -41,11 +41,17 @@ export interface VcsProvider {
  * never crashes on a dev machine.
  */
 export async function getProvider(): Promise<VcsProvider> {
-  if (process.env.GITHUB_ACTIONS === "true") {
+  // Credentials are also accepted outside CI so `generate --with-issues` works
+  // from a laptop; without this, reading the tracker would only ever be
+  // possible from inside a pipeline, which is not where anyone writes docs.
+  const hasGithubCreds = Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY);
+  const hasGitlabCreds = Boolean(process.env.GITLAB_TOKEN && process.env.CI_PROJECT_ID);
+
+  if (process.env.GITHUB_ACTIONS === "true" || hasGithubCreds) {
     const { GithubProvider } = await import("./GithubProvider.js");
     return new GithubProvider();
   }
-  if (process.env.GITLAB_CI === "true") {
+  if (process.env.GITLAB_CI === "true" || hasGitlabCreds) {
     const { GitlabProvider } = await import("./GitlabProvider.js");
     return new GitlabProvider();
   }

@@ -119,7 +119,7 @@ const FIXME = "FIX" + "ME";
 test("adding a marker to a scanned file both shows up and marks the section stale", async () => {
   await withFixtureRepo(async (root) => {
     const before = await generateServiceMd(root);
-    assert.match(before, /markers found/);
+    assert.match(before, /None found in the \d+ scanned source files/);
 
     await writeFile(path.join(root, "src", "index.ts"), `// ${FIXME}: handle refunds\nexport const x = 1;\n`);
 

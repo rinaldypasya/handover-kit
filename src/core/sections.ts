@@ -1,7 +1,7 @@
 import { loadEnvVars, ENV_FILE_CANDIDATES } from "./parsers/env.js";
 import { loadPackageInfo } from "./parsers/packageJson.js";
 import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
-import { detectCi, findTodos, CI_FALLBACK_SOURCES } from "./parsers/ci.js";
+import { detectCi, findTodos, CI_FALLBACK_SOURCES, type TodoMarker } from "./parsers/ci.js";
 import { listSourceFiles } from "./parsers/walk.js";
 import { tryRead } from "./parsers/fsUtil.js";
 
@@ -23,12 +23,37 @@ export const TODO_SCAN_LIMIT = 200;
 /** Cap on rows rendered into the Known Issues table. */
 const TODO_RENDER_LIMIT = 50;
 
+/** Cap on issues pulled from the tracker into Known Issues. */
+const ISSUE_RENDER_LIMIT = 25;
+
+/**
+ * An open ticket from whatever tracker the team uses.
+ *
+ * Declared here rather than imported from `providers/` so core keeps knowing
+ * nothing about hosting platforms — the provider `Issue` type is structurally
+ * the same, and the CLI is what bridges the two.
+ */
+export interface KnownIssue {
+  title: string;
+  url: string;
+  labels: string[];
+}
+
+export interface BuildSectionsOptions {
+  /**
+   * Open tracker issues to list under Known Issues. `undefined` means nobody
+   * asked for them — which is reported differently from an empty array, so the
+   * doc never claims a clean tracker it didn't actually read.
+   */
+  issues?: KnownIssue[];
+}
+
 /**
  * Builds the list of sections for SERVICE.md. Each section knows exactly
  * which files it was derived from, so `handoverkit check` can recompute
  * its hash later and tell you precisely which section went stale and why.
  */
-export async function buildSections(repoRoot: string): Promise<Section[]> {
+export async function buildSections(repoRoot: string, options: BuildSectionsOptions = {}): Promise<Section[]> {
   const pkg = await loadPackageInfo(repoRoot);
   const readme = await tryRead(repoRoot, "README.md");
   const envVars = await loadEnvVars(repoRoot);
@@ -111,16 +136,12 @@ export async function buildSections(repoRoot: string): Promise<Section[]> {
   sections.push({
     id: "known-issues",
     title: "Known Issues",
+    // Only the scanned files are hashed. Tracker issues deliberately are not:
+    // nothing in the repo changes when somebody opens an issue, so folding them
+    // into the hash would make `check` depend on a remote system's mood and
+    // report drift on a commit that changed nothing.
     sourceFiles: scannedFiles,
-    render: async () => {
-      if (todos.length === 0) {
-        return `_No TODO/FIXME markers found in the ${scannedFiles.length} scanned source files._`;
-      }
-      const rows = todos.slice(0, TODO_RENDER_LIMIT).map((t) => `- \`${t.file}:${t.line}\` — ${t.text}`);
-      const truncatedNote =
-        todos.length > TODO_RENDER_LIMIT ? `\n\n_(${todos.length - TODO_RENDER_LIMIT} more not shown)_` : "";
-      return rows.join("\n") + truncatedNote;
-    },
+    render: async () => [renderTrackerIssues(options.issues), renderTodos(todos, scannedFiles.length)].join("\n\n"),
   });
 
   sections.push({
@@ -137,6 +158,48 @@ export async function buildSections(repoRoot: string): Promise<Section[]> {
   });
 
   return sections;
+}
+
+function renderTrackerIssues(issues: KnownIssue[] | undefined): string {
+  const heading = "### From the issue tracker";
+  if (issues === undefined) {
+    return `${heading}\n\n_Not fetched. Re-run \`handoverkit generate --with-issues\` to list open tickets here._`;
+  }
+  if (issues.length === 0) {
+    return `${heading}\n\n_No open issues._`;
+  }
+  // Sorted by URL: the API returns whatever order it likes, and an unstable
+  // order would rewrite this section on every run for no reason.
+  const sorted = [...issues].sort((a, b) => a.url.localeCompare(b.url));
+  const rows = sorted.slice(0, ISSUE_RENDER_LIMIT).map((i) => {
+    const labels = i.labels.length > 0 ? ` — ${i.labels.map((l) => `\`${l}\``).join(", ")}` : "";
+    return `- [${escapeLinkText(i.title)}](${i.url})${labels}`;
+  });
+  const rest = sorted.length - ISSUE_RENDER_LIMIT;
+  return [heading, "", ...rows, ...(rest > 0 ? ["", `_(${rest} more not shown)_`] : [])].join("\n");
+}
+
+/**
+ * Assembled instead of written out: a markdown heading is "#" followed by a
+ * space, which findTodos can't tell apart from a real comment marker. Spelling
+ * the keywords literally here seeds two phantom entries into this repo's own
+ * Known Issues — which is how this was found.
+ */
+export const TODO_HEADING = `### ${"TO" + "DO"}/${"FIX" + "ME"} in source`;
+
+function renderTodos(todos: TodoMarker[], scannedCount: number): string {
+  const heading = TODO_HEADING;
+  if (todos.length === 0) {
+    return `${heading}\n\n_None found in the ${scannedCount} scanned source files._`;
+  }
+  const rows = todos.slice(0, TODO_RENDER_LIMIT).map((t) => `- \`${t.file}:${t.line}\` — ${t.text}`);
+  const rest = todos.length - TODO_RENDER_LIMIT;
+  return [heading, "", ...rows, ...(rest > 0 ? ["", `_(${rest} more not shown)_`] : [])].join("\n");
+}
+
+/** Keeps a title containing brackets from breaking out of its markdown link. */
+function escapeLinkText(title: string): string {
+  return title.replace(/([[\]])/g, "\\$1");
 }
 
 export function extractFirstParagraph(markdown?: string): string | undefined {

@@ -1,4 +1,4 @@
-import { buildSections } from "./sections.js";
+import { buildSections, type KnownIssue } from "./sections.js";
 import { hashFiles } from "./hash.js";
 import { extractNotes, isEmptyNotes, renderNotesBlock } from "./notes.js";
 
@@ -23,10 +23,16 @@ export interface GenerateOptions {
    * you then overwrite a real SERVICE.md with the result.
    */
   previous?: string;
+  /**
+   * Open tracker issues, already fetched by the caller. Core stays offline and
+   * deterministic on purpose: the CLI does the network call, so `generate`
+   * remains a pure function of the repo plus whatever it's handed.
+   */
+  issues?: KnownIssue[];
 }
 
 export async function generateServiceMd(repoRoot: string, options: GenerateOptions = {}): Promise<string> {
-  const sections = await buildSections(repoRoot);
+  const sections = await buildSections(repoRoot, { issues: options.issues });
   // Throws on a half-open block — better to fail before writing than to
   // regenerate over prose we couldn't reliably find the end of.
   const carried = options.previous ? extractNotes(options.previous) : new Map<string, string>();

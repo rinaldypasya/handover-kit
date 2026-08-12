@@ -10,7 +10,7 @@
 # Service Handover Doc
 
 ## Overview
-<!-- handoverkit:id=overview hash=41c16b259959 sources=README.md,package.json -->
+<!-- handoverkit:id=overview hash=0787671ae9e9 sources=README.md,package.json -->
 **handover-kit**
 
 Keep service documentation alive across handovers: generate a living SERVICE.md and flag it when code changes but the docs don't.
@@ -68,8 +68,14 @@ _No hand-written notes yet — anything you write between these two markers surv
 <!-- handoverkit:notes:end id=deployment -->
 
 ## Known Issues
-<!-- handoverkit:id=known-issues hash=a68809ab2e6a sources=src/cli.ts,src/marker.ts,src/core/check.ts,src/core/generate.ts,src/core/hash.ts,src/core/notes.ts,src/core/sections.ts,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests/hash.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts -->
-_No TODO/FIXME markers found in the 20 scanned source files._
+<!-- handoverkit:id=known-issues hash=ab14d51ff77f sources=src/cli.ts,src/marker.ts,src/core/check.ts,src/core/generate.ts,src/core/hash.ts,src/core/notes.ts,src/core/sections.ts,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests/hash.test.ts,tests/issues.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts -->
+### From the issue tracker
+
+_Not fetched. Re-run `handoverkit generate --with-issues` to list open tickets here._
+
+### TODO/FIXME in source
+
+_None found in the 21 scanned source files._
 
 <!-- handoverkit:notes:start id=known-issues -->
 _No hand-written notes yet — anything you write between these two markers survives `handoverkit generate`._

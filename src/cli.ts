@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateServiceMd } from "./core/generate.js";
+import type { KnownIssue } from "./core/sections.js";
 import { checkServiceMd, formatDriftReport } from "./core/check.js";
 import { countHandWrittenNotes } from "./core/notes.js";
 import { tryRead } from "./core/parsers/fsUtil.js";
@@ -19,16 +20,19 @@ program
   .description("Scan the repo and (re)write SERVICE.md")
   .option("-o, --out <file>", "output file", "SERVICE.md")
   .option("-r, --root <dir>", "repo root to scan", ".")
+  .option("--with-issues", "also list open GitHub/GitLab issues under Known Issues", false)
+  .option("--issue-labels <labels>", "comma-separated labels to filter fetched issues")
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.root);
     const outPath = path.resolve(repoRoot, opts.out);
+    const issues = opts.withIssues ? await fetchIssues(opts.issueLabels) : undefined;
     // Read the file we're about to overwrite first: that's what carries the
     // hand-written notes blocks forward. countHandWrittenNotes runs before the
     // write so a malformed block aborts the command instead of eating prose.
     const previous = await tryRead(repoRoot, opts.out);
     const carried = previous ? countHandWrittenNotes(previous) : 0;
 
-    const content = await generateServiceMd(repoRoot, { previous });
+    const content = await generateServiceMd(repoRoot, { previous, issues });
     await writeFile(outPath, content, "utf8");
 
     const where = path.relative(process.cwd(), outPath) || outPath;
@@ -72,6 +76,34 @@ program
       process.exitCode = 1;
     }
   });
+
+/**
+ * Reads open tickets from whichever provider the environment points at.
+ *
+ * Returns undefined — not [] — whenever the tracker couldn't actually be read,
+ * so the doc says "not fetched" rather than asserting a clean tracker nobody
+ * looked at.
+ */
+async function fetchIssues(rawLabels?: string): Promise<KnownIssue[] | undefined> {
+  const provider = await getProvider();
+  if (provider.name === "none") {
+    console.warn(
+      "[handoverkit] --with-issues: no GitHub/GitLab credentials found " +
+        "(set GITHUB_TOKEN + GITHUB_REPOSITORY, or GITLAB_TOKEN + CI_PROJECT_ID). Skipping issue fetch."
+    );
+    return undefined;
+  }
+  const labels = (rawLabels ?? "")
+    .split(",")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  try {
+    return await provider.getOpenIssues(labels);
+  } catch (err) {
+    console.warn(`[handoverkit] could not fetch issues from ${provider.name}: ${errorMessage(err)}`);
+    return undefined;
+  }
+}
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

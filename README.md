@@ -58,6 +58,29 @@ and `.gitlab-ci.yml` for working examples). The comment carries a hidden
 marker, so repeat runs edit the existing comment instead of stacking a new
 one on every push.
 
+## Pulling in open issues
+
+`Known Issues` lists TODO/FIXME markers found in source. It can also list
+open tickets from the tracker:
+
+```bash
+handoverkit generate --with-issues
+handoverkit generate --with-issues --issue-labels bug,p1
+```
+
+Credentials come from the environment — `GITHUB_TOKEN` + `GITHUB_REPOSITORY`,
+or `GITLAB_TOKEN` + `CI_PROJECT_ID`. Both work outside CI, so you can run this
+from a laptop; without them the fetch is skipped with a warning.
+
+Tickets are **not** part of the section hash, and that's deliberate. Nothing
+in the repo changes when somebody opens an issue, so hashing them would make
+`check` depend on a remote system and report drift on commits that changed
+nothing. The trade-off is the one listed under limitations: the ticket list is
+a snapshot from the last `generate`.
+
+A tracker that wasn't read renders as *"Not fetched"*, never as *"No open
+issues"* — the doc shouldn't claim a clean tracker nobody looked at.
+
 ## Hand-written notes survive regeneration
 
 Everything a section renders is derived from source files, so `generate`
@@ -126,10 +149,11 @@ in `core/` needs to change — that's the point of the interface boundary.
   generated half of a section is still overwritten on the next run.
 - The "Architecture" / dependency-graph section from the original design
   isn't in this MVP yet — `sections.ts` is the place to add it.
-- `Known Issues` only scans TODO/FIXME in source files, capped at 200 files
-  for speed on large repos; it doesn't yet pull from GitHub/GitLab issues
-  even though `VcsProvider.getOpenIssues()` already supports it — wiring
-  that in is a good first contribution.
+- `Known Issues` scans TODO/FIXME in at most 200 source files, for speed on
+  large repos.
+- Issues pulled with `--with-issues` are a snapshot. They're written into the
+  doc but not hashed, so the doc can describe a closed ticket until someone
+  regenerates.
 - The Deployment section hashes the CI files it found. If a repo had *no*
   CI and someone adds `.github/workflows/deploy.yml`, that specific case
   isn't detected as drift (a new `.gitlab-ci.yml` is). Hashing a directory
