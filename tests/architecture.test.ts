@@ -115,16 +115,18 @@ test("package subpaths and scopes collapse to the installed name", async () => {
   }
 });
 
-test("non-JavaScript files are counted, not parsed", async () => {
+test("files in an unsupported language are counted, not parsed", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "handoverkit-poly-"));
   try {
-    await writeFile(path.join(root, "main.go"), 'import "fmt"\n');
+    // JavaScript, Python and Go are parsed; see tests/languages.test.ts. Ruby
+    // is counted so the section can say how much it couldn't read.
+    await writeFile(path.join(root, "legacy.rb"), 'require "json"\n');
     await writeFile(path.join(root, "app.ts"), "export const x = 1;\n");
 
-    const graph = await buildModuleGraph(root, ["app.ts", "main.go"]);
+    const graph = await buildModuleGraph(root, ["app.ts", "legacy.rb"]);
 
     assert.equal(graph.unparsedCount, 1);
-    assert.deepEqual(graph.packages, [], "Go imports must not leak in as npm packages");
+    assert.deepEqual(graph.packages, [], "a Ruby require must not leak in as an npm package");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

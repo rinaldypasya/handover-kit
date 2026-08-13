@@ -110,9 +110,15 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
       if (graph.packages.length > 0) {
         parts.push(`External packages imported: ${graph.packages.map((p) => `\`${p}\``).join(", ")}.`);
       }
-      if (graph.unparsedCount > 0) {
+      if (graph.pythonSeen) {
         parts.push(
-          `_${graph.unparsedCount} scanned file(s) aren't JavaScript/TypeScript and weren't parsed for imports._`
+          "_Python imports shape the table above, but their external packages aren't listed: an import name doesn't reliably map to a distribution name (`import yaml` comes from `PyYAML`)._"
+        );
+      }
+      if (graph.unparsedCount > 0) {
+        const n = graph.unparsedCount;
+        parts.push(
+          `_${n} scanned ${n === 1 ? "file is" : "files are"} in a language this tool doesn't parse for imports (it reads JavaScript/TypeScript, Python and Go)._`
         );
       }
       return parts.join("\n\n");

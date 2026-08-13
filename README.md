@@ -123,6 +123,14 @@ Directory granularity is deliberate — a per-file graph of a real service is
 unreadable, and a handover needs the shape, not the wiring. Imports within one
 directory aren't edges, so the table shows coupling rather than cohesion.
 
+**JavaScript/TypeScript, Python and Go** are parsed. Python relative and
+absolute in-repo imports both resolve (`from app.store.db import connect` finds
+`app/store`); Go resolves in-repo paths through the module path in `go.mod`.
+Go's third-party paths are listed because a dot in the first segment
+distinguishes them from the standard library with certainty — a rule, not a
+guess. Other languages are counted, and the section says how many it couldn't
+read.
+
 Because it's derived from the same scanned files the hash covers, deleting a
 dependency edge shows up as drift on this section.
 
@@ -216,11 +224,18 @@ in `core/` needs to change — that's the point of the interface boundary.
 
 - Prose is only protected inside a notes block. Text you type into the
   generated half of a section is still overwritten on the next run.
-- `Architecture` reads imports with regexes rather than a parser, so a
-  specifier sitting inside a string or comment counts as an import. Package
-  names are cross-checked against `package.json` to keep that out of the
-  output, which means a package imported but never declared won't be listed.
-  Non-JavaScript files are counted but not parsed for imports.
+- `Architecture` reads imports with regexes rather than a parser. The
+  JavaScript patterns can't be line-anchored, so a specifier inside a string
+  or comment counts as an import; package names are cross-checked against
+  `package.json` to keep that out of the output, which means a package
+  imported but never declared won't be listed either.
+- Python external packages aren't listed at all, because an import name
+  doesn't reliably map to a distribution name (`import yaml` ships in
+  `PyYAML`). Python imports still shape the dependency table.
+- Go in-repo edges need `go.mod` to know the module path. Without it,
+  third-party paths are still listed but no internal edges are found.
+- Languages other than JavaScript/TypeScript, Python and Go are counted but
+  not parsed for imports.
 - `Known Issues` scans TODO/FIXME in at most 200 source files, for speed on
   large repos.
 - Issues pulled with `--with-issues` are a snapshot. They're written into the
