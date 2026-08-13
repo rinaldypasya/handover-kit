@@ -27,7 +27,17 @@ Development:
 npm test        # node:test suite — no extra test runner dependency
 npm run typecheck
 npm run build
+npm run docs    # regenerate SERVICE.md and examples/SERVICE.md
 ```
+
+CI also runs `npm run verify:docs`, which regenerates and fails on a diff.
+`check` only proves each section's hash matches its sources; it can't tell you
+the committed document is what the *generator* produces today. Change a
+renderer — or upgrade handover-kit in a service that depends on it — and the
+content goes stale with every hash still matching. That script is the guard.
+It diffs against `HEAD`, so it assumes a complete commit and will report a
+difference mid-edit; it's deliberately not part of `npm test`, where every
+source edit would break the suite until you regenerated.
 
 ## How drift detection works
 

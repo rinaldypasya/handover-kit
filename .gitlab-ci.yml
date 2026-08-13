@@ -10,6 +10,9 @@ test:
     - npm run typecheck
     - npm test
     - npm run build
+    # Hashes matching doesn't mean the document matches the generator; see the
+    # equivalent step in .github/workflows/handover-check.yml.
+    - npm run verify:docs
 
 handover-check:
   stage: handover

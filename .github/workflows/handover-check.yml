@@ -27,6 +27,14 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # `check` verifies each section's hash against its source files. It does
+      # not verify that the committed SERVICE.md is what `generate` produces
+      # today — change a renderer (or upgrade handover-kit itself) and the
+      # document goes stale in content with every hash still matching.
+      # Regenerating and failing on a diff is what closes that.
+      - name: SERVICE.md is up to date with the generator
+        run: npm run verify:docs
+
   check:
     needs: test
     runs-on: ubuntu-latest

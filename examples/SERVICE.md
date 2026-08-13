@@ -10,7 +10,7 @@
 # Service Handover Doc
 
 ## Overview
-<!-- handoverkit:id=overview hash=c696df680aa4 sources=README.md,package.json -->
+<!-- handoverkit:id=overview hash=7f12d78871d1 sources=README.md,package.json -->
 **handover-kit**
 
 Keep service documentation alive across handovers: generate a living SERVICE.md and flag it when code changes but the docs don't.
@@ -53,7 +53,7 @@ Postgres or Redis this table implies.
 <!-- handoverkit:notes:end id=environment -->
 
 ## Local Setup
-<!-- handoverkit:id=local-setup hash=51a2f9d202b0 sources=package.json -->
+<!-- handoverkit:id=local-setup hash=5f05cf748238 sources=package.json -->
 | Command | Runs |
 | --- | --- |
 | `npm run build` | `tsc -p tsconfig.json` |
@@ -62,6 +62,8 @@ Postgres or Redis this table implies.
 | `npm run dev` | `tsx src/cli.ts` |
 | `npm run generate` | `tsx src/cli.ts generate` |
 | `npm run check` | `tsx src/cli.ts check` |
+| `npm run docs` | `tsx src/cli.ts generate && tsx src/cli.ts generate -o examples/SERVICE.md` |
+| `npm run verify:docs` | `npm run docs && git diff --exit-code -- SERVICE.md examples/SERVICE.md` |
 | `npm run prepublishOnly` | `npm run typecheck && npm test && npm run build` |
 
 Runtime dependencies: `commander`.
@@ -73,7 +75,7 @@ passes locally it passes there.
 <!-- handoverkit:notes:end id=local-setup -->
 
 ## Deployment
-<!-- handoverkit:id=deployment hash=5c8b9f1b2adf sources=.github/workflows,.github/workflows/handover-check.yml,.gitlab-ci.yml -->
+<!-- handoverkit:id=deployment hash=3622480b32b7 sources=.github/workflows,.github/workflows/handover-check.yml,.gitlab-ci.yml -->
 Deployment is driven by more than one pipeline:
 
 - **GitHub Actions** — `.github/workflows/handover-check.yml`
