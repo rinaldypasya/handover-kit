@@ -78,8 +78,8 @@ test("tracker issues never affect drift", async () => {
     assert.deepEqual(results.filter((r) => r.stale).map((r) => r.id), []);
     assert.deepEqual(
       results.find((r) => r.id === "known-issues")?.sources,
-      ["src/index.ts"],
-      "only scanned files belong in the hash"
+      ["src", "src/index.ts"],
+      "the hash covers scanned paths only — no trace of the tracker"
     );
   });
 });

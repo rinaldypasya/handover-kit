@@ -2,7 +2,7 @@ import { loadEnvVars, ENV_FILE_CANDIDATES } from "./parsers/env.js";
 import { loadPackageInfo } from "./parsers/packageJson.js";
 import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
 import { detectCi, findTodos, CI_SOURCE_ROOTS, type TodoMarker } from "./parsers/ci.js";
-import { listSourceFiles } from "./parsers/walk.js";
+import { listSourceFiles, directoriesOf } from "./parsers/walk.js";
 import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
 import { CONFIG_FILENAME, EMPTY_CONFIG, type CustomSectionConfig, type HandoverConfig } from "./config.js";
@@ -65,6 +65,11 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   const ci = await detectCi(repoRoot);
   const owners = await loadCodeowners(repoRoot);
   const scannedFiles = (await listSourceFiles(repoRoot, TODO_SCAN_LIMIT)).slice(0, TODO_SCAN_LIMIT);
+  // Files catch edits and deletions; the directories they live in catch
+  // additions. Without the directories, a file added after `generate` — a new
+  // module, a new TODO — is invisible to `check`, because the recorded source
+  // list was written before that file existed.
+  const scannedSources = [...directoriesOf(scannedFiles), ...scannedFiles].sort();
   const todos = await findTodos(repoRoot, scannedFiles);
   // Only filter against package.json when there is one; a repo without it gives
   // us nothing to verify against, and an unfiltered list beats an empty one.
@@ -90,7 +95,7 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   sections.push({
     id: "architecture",
     title: "Architecture",
-    sourceFiles: scannedFiles,
+    sourceFiles: scannedSources,
     render: async () => {
       if (graph.modules.length === 0) {
         return "_No source files were scanned, so there's nothing to map here._";
@@ -179,7 +184,7 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
     // nothing in the repo changes when somebody opens an issue, so folding them
     // into the hash would make `check` depend on a remote system's mood and
     // report drift on a commit that changed nothing.
-    sourceFiles: scannedFiles,
+    sourceFiles: scannedSources,
     render: async () => [renderTrackerIssues(options.issues), renderTodos(todos, scannedFiles.length)].join("\n\n"),
   });
 

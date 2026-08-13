@@ -52,9 +52,14 @@ normalised to `/` and directory walks are explicitly sorted, so a hash
 generated on one machine matches the one recomputed in CI.
 
 A source can also be a **directory**, in which case its sorted entry names
-are hashed. That's how a section notices a file it never knew about:
-`Deployment` records `.github/workflows` itself, so adding a repo's first
-pipeline — or a second one — is drift, not silence.
+are hashed. That's how a section notices a file it never knew about — a
+recorded file list can't, since it was written before the new file existed:
+
+- `Deployment` records `.github/workflows` itself, so adding a repo's first
+  pipeline, or a second one, is drift rather than silence.
+- `Known Issues` and `Architecture` record the directories their scanned files
+  live in, so a new module — or a new TODO in a new file — is flagged instead
+  of quietly missed.
 
 Run it in CI with `--ci` (non-zero exit on drift, useful as a required
 check) and `--post-comment` (posts the report on the PR/MR via whichever
@@ -221,8 +226,11 @@ in `core/` needs to change — that's the point of the interface boundary.
 - Issues pulled with `--with-issues` are a snapshot. They're written into the
   doc but not hashed, so the doc can describe a closed ticket until someone
   regenerates.
-- Adding or removing any scanned source file changes the Known Issues and
-  Architecture hashes, so those sections go stale more eagerly than the rest.
+- Known Issues and Architecture track the directories holding the files they
+  scanned, but not the repo root — the root listing contains `SERVICE.md`,
+  which `generate` writes after hashing, so tracking it would make every first
+  run report itself as drifted. A new source file added at the top level is
+  therefore picked up on the next `generate` rather than flagged by `check`.
 
 ## License
 

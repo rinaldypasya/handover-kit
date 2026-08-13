@@ -103,12 +103,14 @@ test("Deployment lists both pipelines when a repo runs GitHub Actions and GitLab
   });
 });
 
-test("Known Issues hashes exactly the files it scanned", async () => {
+test("Known Issues hashes the files it scanned and the directories holding them", async () => {
   await withFixtureRepo(async (root) => {
     const content = await generateServiceMd(root);
     const sources = section(await checkServiceMd(root, content), "known-issues").sources;
 
-    assert.deepEqual(sources, ["src/index.ts"]);
+    // See tests/scanned-sources.test.ts — the directory is what makes an added
+    // file detectable at all.
+    assert.deepEqual(sources, ["src", "src/index.ts"]);
   });
 });
 

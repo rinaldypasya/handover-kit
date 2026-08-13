@@ -10,6 +10,27 @@ export function toPosix(relativePath: string): string {
 }
 
 /**
+ * The distinct directories a scanned file list lives in, sorted.
+ *
+ * Sections that scan a whole tree hash these alongside the files themselves.
+ * The files cover content changes; only a directory listing covers a file
+ * being *added*, which the recorded file list by definition cannot — it was
+ * written before the new file existed.
+ *
+ * The repo root is excluded deliberately. Its listing contains SERVICE.md,
+ * which `generate` writes *after* computing hashes, so tracking "." would make
+ * every first run report itself as drifted.
+ */
+export function directoriesOf(files: string[]): string[] {
+  const dirs = new Set<string>();
+  for (const file of files) {
+    const dir = path.posix.dirname(toPosix(file));
+    if (dir !== "." && dir !== "") dirs.add(dir);
+  }
+  return [...dirs].sort();
+}
+
+/**
  * Lightweight recursive source file listing, capped so it stays fast on
  * large repos without pulling in a glob dependency. Good enough for the
  * "scan for TODO/FIXME" use case — not meant to replace `git ls-files`.
