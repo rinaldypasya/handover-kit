@@ -1,6 +1,7 @@
 import { buildSections, type KnownIssue } from "./sections.js";
 import { hashFiles } from "./hash.js";
 import { extractNotes, isEmptyNotes, renderNotesBlock } from "./notes.js";
+import { loadConfig } from "./config.js";
 
 // NB: HTML comments don't nest — the first "-->" closes the block. So this
 // header must never contain a literal example of a handoverkit comment, or
@@ -29,10 +30,16 @@ export interface GenerateOptions {
    * remains a pure function of the repo plus whatever it's handed.
    */
   issues?: KnownIssue[];
+  /**
+   * Path to a config file, relative to repoRoot. Omitted, the repo's
+   * handoverkit.config.json is used when present and defaults apply when not.
+   */
+  configPath?: string;
 }
 
 export async function generateServiceMd(repoRoot: string, options: GenerateOptions = {}): Promise<string> {
-  const sections = await buildSections(repoRoot, { issues: options.issues });
+  const config = await loadConfig(repoRoot, options.configPath);
+  const sections = await buildSections(repoRoot, { issues: options.issues, config });
   // Throws on a half-open block — better to fail before writing than to
   // regenerate over prose we couldn't reliably find the end of.
   const carried = options.previous ? extractNotes(options.previous) : new Map<string, string>();

@@ -63,6 +63,44 @@ and `.gitlab-ci.yml` for working examples). The comment carries a hidden
 marker, so repeat runs edit the existing comment instead of stacking a new
 one on every push.
 
+## Adding your own sections
+
+Drop a `handoverkit.config.json` at the repo root (or point at one with
+`--config`) to track things the built-in sections know nothing about:
+
+```json
+{
+  "sections": [
+    {
+      "id": "oncall",
+      "title": "On-call Rota",
+      "sources": ["ops/rota.yml", "ops/escalation.md"],
+      "body": "Rotates Mondays. Escalation path in `ops/escalation.md`."
+    }
+  ],
+  "exclude": ["known-issues"],
+  "order": ["oncall", "overview"]
+}
+```
+
+- **`sources`** is the point: those paths get hashed, so the section goes
+  stale when they change. Directories are allowed and hash their listing.
+- **`body`** is optional. Without it the section is a tracked heading plus a
+  notes block — often exactly what you want, since the prose is the part a
+  generator can't write.
+- **`exclude`** drops built-in sections; **`order`** pulls ids to the front
+  and leaves the rest in place.
+
+The config file joins the sources of every section it defines, so changing
+which files a section tracks re-baselines it the same way changing those
+files would.
+
+Bad config fails the command rather than producing a subtly wrong document:
+unknown keys, duplicate or colliding ids, multi-line titles, empty `sources`,
+and paths escaping the repo with `..` are all rejected by name. Ids are
+restricted to the charset the metadata comments accept — an id containing a
+space or `-->` would corrupt the document it's embedded in.
+
 ## The Architecture section
 
 `Architecture` answers "what talks to what" by grouping scanned files per
@@ -148,6 +186,7 @@ src/
   cli.ts                 entry point (generate / check commands)
   marker.ts              the marker embedded in reports, so comments update in place
   core/
+    config.ts             parses and validates handoverkit.config.json
     generate.ts           builds SERVICE.md from sections
     notes.ts               carries hand-written notes blocks across regeneration
     check.ts               parses SERVICE.md, recomputes hashes, reports drift

@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateServiceMd } from "./core/generate.js";
 import type { KnownIssue } from "./core/sections.js";
+import { CONFIG_FILENAME } from "./core/config.js";
 import { checkServiceMd, formatDriftReport } from "./core/check.js";
 import { countHandWrittenNotes } from "./core/notes.js";
 import { tryRead } from "./core/parsers/fsUtil.js";
@@ -22,6 +23,7 @@ program
   .option("-r, --root <dir>", "repo root to scan", ".")
   .option("--with-issues", "also list open GitHub/GitLab issues under Known Issues", false)
   .option("--issue-labels <labels>", "comma-separated labels to filter fetched issues")
+  .option("-c, --config <file>", `config file (defaults to ${CONFIG_FILENAME} when present)`)
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.root);
     const outPath = path.resolve(repoRoot, opts.out);
@@ -32,7 +34,7 @@ program
     const previous = await tryRead(repoRoot, opts.out);
     const carried = previous ? countHandWrittenNotes(previous) : 0;
 
-    const content = await generateServiceMd(repoRoot, { previous, issues });
+    const content = await generateServiceMd(repoRoot, { previous, issues, configPath: opts.config });
     await writeFile(outPath, content, "utf8");
 
     const where = path.relative(process.cwd(), outPath) || outPath;

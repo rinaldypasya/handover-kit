@@ -5,6 +5,7 @@ import { detectCi, findTodos, CI_SOURCE_ROOTS, type TodoMarker } from "./parsers
 import { listSourceFiles } from "./parsers/walk.js";
 import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
+import { CONFIG_FILENAME, EMPTY_CONFIG, type CustomSectionConfig, type HandoverConfig } from "./config.js";
 
 export interface Section {
   id: string;
@@ -47,6 +48,8 @@ export interface BuildSectionsOptions {
    * doc never claims a clean tracker it didn't actually read.
    */
   issues?: KnownIssue[];
+  /** Per-repo config: custom sections, exclusions, ordering. */
+  config?: HandoverConfig;
 }
 
 /**
@@ -55,6 +58,7 @@ export interface BuildSectionsOptions {
  * its hash later and tell you precisely which section went stale and why.
  */
 export async function buildSections(repoRoot: string, options: BuildSectionsOptions = {}): Promise<Section[]> {
+  const config = options.config ?? EMPTY_CONFIG;
   const pkg = await loadPackageInfo(repoRoot);
   const readme = await tryRead(repoRoot, "README.md");
   const envVars = await loadEnvVars(repoRoot);
@@ -192,7 +196,65 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
     },
   });
 
-  return sections;
+  return applyConfig(sections, config);
+}
+
+/**
+ * Folds the repo's config into the built-in section list: drop what it
+ * excludes, append what it declares, reorder if it says so.
+ *
+ * Exclusions and ordering are validated against the ids that actually exist
+ * rather than ignored — a typo'd id should say so, not silently do nothing.
+ */
+function applyConfig(builtIns: Section[], config: HandoverConfig): Section[] {
+  const builtInIds = new Set(builtIns.map((s) => s.id));
+
+  for (const custom of config.sections) {
+    if (builtInIds.has(custom.id)) {
+      throw new Error(
+        `${CONFIG_FILENAME}: section id "${custom.id}" is already a built-in section. Pick another id, or list it under "exclude" to replace it.`
+      );
+    }
+  }
+
+  for (const id of config.exclude) {
+    if (!builtInIds.has(id)) {
+      throw new Error(
+        `${CONFIG_FILENAME}: "exclude" names "${id}", which isn't a built-in section. Known: ${[...builtInIds].join(", ")}.`
+      );
+    }
+  }
+
+  const kept = builtIns.filter((s) => !config.exclude.includes(s.id));
+  const sections = [...kept, ...config.sections.map(toSection)];
+
+  if (!config.order) return sections;
+
+  const known = new Set(sections.map((s) => s.id));
+  for (const id of config.order) {
+    if (!known.has(id)) {
+      throw new Error(
+        `${CONFIG_FILENAME}: "order" names "${id}", which is neither a built-in nor a configured section.`
+      );
+    }
+  }
+  // Listed ids lead, in the given order; everything else keeps its relative
+  // position behind them, so a partial order doesn't have to enumerate the lot.
+  const ranked = config.order.map((id) => sections.find((s) => s.id === id)!);
+  return [...ranked, ...sections.filter((s) => !config.order!.includes(s.id))];
+}
+
+function toSection(custom: CustomSectionConfig): Section {
+  return {
+    id: custom.id,
+    title: custom.title,
+    // The config file joins the section's own sources: change which files a
+    // section tracks and it should re-baseline, same as changing the files.
+    sourceFiles: [...new Set([CONFIG_FILENAME, ...custom.sources])].sort(),
+    render: async () =>
+      custom.body ??
+      "_No generated content for this section — write what matters in the notes block below._",
+  };
 }
 
 function renderTrackerIssues(issues: KnownIssue[] | undefined): string {
