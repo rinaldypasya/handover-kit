@@ -157,6 +157,22 @@ a snapshot from the last `generate`.
 A tracker that wasn't read renders as *"Not fetched"*, never as *"No open
 issues"* — the doc shouldn't claim a clean tracker nobody looked at.
 
+### Noticing when the snapshot ages
+
+`generate --with-issues` records which tickets the doc was written against, in
+a hidden marker. `check --with-issues` reads that back, fetches the tracker,
+and reports both directions — tickets the doc lists that are closed now, and
+open tickets the doc doesn't mention:
+
+```bash
+handoverkit check --ci --with-issues
+```
+
+This note is **advisory and never changes the exit code**, including under
+`--ci`. That's the same reasoning that keeps tickets out of the section hash:
+a remote system deciding your build status means failing commits that changed
+nothing. `--ci` still gates on file-derived drift alone.
+
 ## Hand-written notes survive regeneration
 
 Everything a section renders is derived from source files, so `generate`
@@ -238,9 +254,10 @@ in `core/` needs to change — that's the point of the interface boundary.
   not parsed for imports.
 - `Known Issues` scans TODO/FIXME in at most 200 source files, for speed on
   large repos.
-- Issues pulled with `--with-issues` are a snapshot. They're written into the
-  doc but not hashed, so the doc can describe a closed ticket until someone
-  regenerates.
+- Issues pulled with `--with-issues` are a snapshot: written into the doc but
+  not hashed, so the doc can describe a closed ticket until someone
+  regenerates. `check --with-issues` reports when that has happened, but as an
+  advisory note only — it deliberately doesn't fail the check.
 - Known Issues and Architecture track the directories holding the files they
   scanned, but not the repo root — the root listing contains `SERVICE.md`,
   which `generate` writes after hashing, so tracking it would make every first

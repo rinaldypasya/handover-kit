@@ -1,5 +1,6 @@
 import { hashFiles } from "./hash.js";
 import { REPORT_MARKER } from "../marker.js";
+import type { KnownIssue } from "./sections.js";
 
 export interface DriftResult {
   id: string;
@@ -75,6 +76,65 @@ export function formatDriftReport(results: DriftResult[]): string {
     "",
     "If the docs are still accurate as-is, re-run `handoverkit generate` and commit the updated SERVICE.md — that re-baselines the stored hash for these sections."
   );
+  return lines.join("\n");
+}
+
+const ISSUES_MARKER_RE = /<!--\s*handoverkit:issues=([^>]*?)\s*-->/;
+
+/**
+ * The ticket URLs the document was generated against, or undefined if it was
+ * generated without `--with-issues` and so never claimed a ticket list at all.
+ */
+export function extractDocumentedIssueUrls(serviceMd: string): string[] | undefined {
+  const match = serviceMd.match(ISSUES_MARKER_RE);
+  if (!match) return undefined;
+  return match[1].split(/\s+/).filter(Boolean).sort();
+}
+
+export interface IssueComparison {
+  /** Documented, but not open in the tracker any more. */
+  closed: string[];
+  /** Open in the tracker, but not in the document. */
+  missing: KnownIssue[];
+}
+
+export function compareDocumentedIssues(documented: string[], open: KnownIssue[]): IssueComparison {
+  const openUrls = new Set(open.map((i) => i.url));
+  const documentedUrls = new Set(documented);
+  return {
+    closed: documented.filter((url) => !openUrls.has(url)).sort(),
+    missing: open.filter((i) => !documentedUrls.has(i.url)).sort((a, b) => a.url.localeCompare(b.url)),
+  };
+}
+
+/**
+ * Advisory only, and deliberately so.
+ *
+ * A ticket list is a snapshot of a remote system. Letting it drive the drift
+ * verdict would make `check` non-deterministic and fail builds on commits that
+ * changed nothing — the reason tracker issues stay out of the section hash.
+ * This note tells you the snapshot aged; it does not touch the exit code.
+ */
+export function formatIssueNote(comparison: IssueComparison): string {
+  const { closed, missing } = comparison;
+  if (closed.length === 0 && missing.length === 0) {
+    return "ℹ️ handover-kit: the documented ticket list still matches the tracker.";
+  }
+
+  const lines = ["ℹ️ **handover-kit**: the documented ticket list has aged (advisory — this does not fail the check).", ""];
+  if (closed.length > 0) {
+    lines.push(`${closed.length} ticket${closed.length === 1 ? "" : "s"} listed in SERVICE.md ${closed.length === 1 ? "is" : "are"} no longer open:`, "");
+    lines.push(...closed.slice(0, 10).map((url) => `- ${url}`));
+    if (closed.length > 10) lines.push(`- _(${closed.length - 10} more)_`);
+    lines.push("");
+  }
+  if (missing.length > 0) {
+    lines.push(`${missing.length} open ticket${missing.length === 1 ? "" : "s"} ${missing.length === 1 ? "isn't" : "aren't"} in SERVICE.md:`, "");
+    lines.push(...missing.slice(0, 10).map((i) => `- [${i.title.replace(/([[\]])/g, "\\$1")}](${i.url})`));
+    if (missing.length > 10) lines.push(`- _(${missing.length - 10} more)_`);
+    lines.push("");
+  }
+  lines.push("Re-run `handoverkit generate --with-issues` and commit to refresh it.");
   return lines.join("\n");
 }
 

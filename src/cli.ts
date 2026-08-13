@@ -5,7 +5,13 @@ import path from "node:path";
 import { generateServiceMd } from "./core/generate.js";
 import type { KnownIssue } from "./core/sections.js";
 import { CONFIG_FILENAME } from "./core/config.js";
-import { checkServiceMd, formatDriftReport } from "./core/check.js";
+import {
+  checkServiceMd,
+  compareDocumentedIssues,
+  extractDocumentedIssueUrls,
+  formatDriftReport,
+  formatIssueNote,
+} from "./core/check.js";
 import { countHandWrittenNotes } from "./core/notes.js";
 import { tryRead } from "./core/parsers/fsUtil.js";
 import { getProvider } from "./providers/VcsProvider.js";
@@ -49,6 +55,8 @@ program
   .option("-r, --root <dir>", "repo root to scan", ".")
   .option("--ci", "exit with code 1 if any section is stale (for CI gating)", false)
   .option("--post-comment", "post the drift report as a PR/MR comment", false)
+  .option("--with-issues", "also compare the documented ticket list against the tracker (advisory)", false)
+  .option("--issue-labels <labels>", "comma-separated labels to filter fetched issues")
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.root);
     const content = await tryRead(repoRoot, opts.file);
@@ -59,7 +67,8 @@ program
     }
 
     const results = await checkServiceMd(repoRoot, content);
-    const report = formatDriftReport(results);
+    const issueNote = opts.withIssues ? await buildIssueNote(content, opts.issueLabels) : undefined;
+    const report = [formatDriftReport(results), issueNote].filter(Boolean).join("\n\n");
     console.log(report);
 
     if (opts.postComment) {
@@ -73,11 +82,28 @@ program
       }
     }
 
+    // Only file-derived drift gates CI. The issue note is information; letting
+    // a remote tracker decide the exit code would fail builds on commits that
+    // changed nothing.
     const anyStale = results.some((r) => r.stale);
     if (opts.ci && anyStale) {
       process.exitCode = 1;
     }
   });
+
+async function buildIssueNote(serviceMd: string, rawLabels?: string): Promise<string | undefined> {
+  const documented = extractDocumentedIssueUrls(serviceMd);
+  if (documented === undefined) {
+    console.warn(
+      "[handoverkit] --with-issues: SERVICE.md has no recorded ticket list. " +
+        "Run `handoverkit generate --with-issues` first."
+    );
+    return undefined;
+  }
+  const open = await fetchIssues(rawLabels);
+  if (open === undefined) return undefined;
+  return formatIssueNote(compareDocumentedIssues(documented, open));
+}
 
 /**
  * Reads open tickets from whichever provider the environment points at.

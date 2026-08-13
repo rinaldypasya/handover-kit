@@ -268,13 +268,26 @@ function toSection(custom: CustomSectionConfig): Section {
   };
 }
 
+/**
+ * Records which tickets the document was written against, invisibly.
+ *
+ * `check --with-issues` reads this back to say "the doc lists tickets that are
+ * closed now". Parsing the rendered bullet list would work until someone
+ * hand-edited it; a marker is unambiguous. Space-separated because a URL
+ * cannot contain a raw space, and outside the hash because tracker state is
+ * not a property of the repo.
+ */
+export function renderIssuesMarker(issues: KnownIssue[]): string {
+  return `<!-- handoverkit:issues=${issues.map((i) => i.url).sort().join(" ")} -->`;
+}
+
 function renderTrackerIssues(issues: KnownIssue[] | undefined): string {
   const heading = "### From the issue tracker";
   if (issues === undefined) {
     return `${heading}\n\n_Not fetched. Re-run \`handoverkit generate --with-issues\` to list open tickets here._`;
   }
   if (issues.length === 0) {
-    return `${heading}\n\n_No open issues._`;
+    return `${heading}\n${renderIssuesMarker(issues)}\n\n_No open issues._`;
   }
   // Sorted by URL: the API returns whatever order it likes, and an unstable
   // order would rewrite this section on every run for no reason.
@@ -284,7 +297,13 @@ function renderTrackerIssues(issues: KnownIssue[] | undefined): string {
     return `- [${escapeLinkText(i.title)}](${i.url})${labels}`;
   });
   const rest = sorted.length - ISSUE_RENDER_LIMIT;
-  return [heading, "", ...rows, ...(rest > 0 ? ["", `_(${rest} more not shown)_`] : [])].join("\n");
+  return [
+    heading,
+    renderIssuesMarker(issues),
+    "",
+    ...rows,
+    ...(rest > 0 ? ["", `_(${rest} more not shown)_`] : []),
+  ].join("\n");
 }
 
 /**
