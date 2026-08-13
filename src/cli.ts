@@ -3,8 +3,9 @@ import { Command } from "commander";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateServiceMd } from "./core/generate.js";
-import type { KnownIssue } from "./core/sections.js";
+import { buildSections, type KnownIssue } from "./core/sections.js";
 import { CONFIG_FILENAME } from "./core/config.js";
+import { writeStarterConfig } from "./core/init.js";
 import {
   checkServiceMd,
   compareDocumentedIssues,
@@ -43,9 +44,31 @@ program
     const content = await generateServiceMd(repoRoot, { previous, issues, configPath: opts.config });
     await writeFile(outPath, content, "utf8");
 
-    const where = path.relative(process.cwd(), outPath) || outPath;
+    // Whichever reads better: a relative path climbing out of cwd with a
+    // stack of "../" is noisier than just printing the absolute one.
+    const relative = path.relative(process.cwd(), outPath);
+    const where = relative && relative.length < outPath.length ? relative : outPath;
     const suffix = carried > 0 ? ` (kept ${carried} hand-written notes block${carried === 1 ? "" : "s"})` : "";
     console.log(`[handoverkit] wrote ${where}${suffix}`);
+  });
+
+program
+  .command("init")
+  .description(`Write a starter ${CONFIG_FILENAME} and list the built-in section ids`)
+  .option("-r, --root <dir>", "repo root", ".")
+  .option("-o, --out <file>", "config file to write", CONFIG_FILENAME)
+  .option("--force", "overwrite an existing config file", false)
+  .action(async (opts) => {
+    const repoRoot = path.resolve(opts.root);
+    const file = await writeStarterConfig(repoRoot, { out: opts.out, force: opts.force });
+
+    // Read the ids off the real section list rather than a hard-coded copy, so
+    // this can't drift from what `exclude` and `order` will actually accept.
+    const builtInIds = (await buildSections(repoRoot)).map((s) => s.id);
+
+    console.log(`[handoverkit] wrote ${file}`);
+    console.log(`[handoverkit] built-in section ids for "exclude" and "order": ${builtInIds.join(", ")}`);
+    console.log(`[handoverkit] edit the example section (or delete it), then run \`handoverkit generate\`.`);
   });
 
 program

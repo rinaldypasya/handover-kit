@@ -10,7 +10,7 @@
 # Service Handover Doc
 
 ## Overview
-<!-- handoverkit:id=overview hash=038e87934750 sources=README.md,package.json -->
+<!-- handoverkit:id=overview hash=c696df680aa4 sources=README.md,package.json -->
 **handover-kit**
 
 Keep service documentation alive across handovers: generate a living SERVICE.md and flag it when code changes but the docs don't.
@@ -22,14 +22,14 @@ so it doubles as the fixture we notice regressions in.
 <!-- handoverkit:notes:end id=overview -->
 
 ## Architecture
-<!-- handoverkit:id=architecture hash=43dbff447764 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scanned-sources.test.ts -->
+<!-- handoverkit:id=architecture hash=8193d09e6bb8 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scanned-sources.test.ts -->
 | Directory | Files | Imports from |
 | --- | --- | --- |
 | `src` | 2 | `src/core`, `src/core/parsers`, `src/providers` |
-| `src/core` | 6 | `src`, `src/core/parsers` |
+| `src/core` | 7 | `src`, `src/core/parsers` |
 | `src/core/parsers` | 7 | _(nothing internal)_ |
 | `src/providers` | 3 | `src` |
-| `tests` | 11 | `src`, `src/core`, `src/core/parsers` |
+| `tests` | 12 | `src`, `src/core`, `src/core/parsers` |
 
 External packages imported: `commander`.
 
@@ -84,14 +84,14 @@ _No hand-written notes yet — anything you write between these two markers surv
 <!-- handoverkit:notes:end id=deployment -->
 
 ## Known Issues
-<!-- handoverkit:id=known-issues hash=43dbff447764 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scanned-sources.test.ts -->
+<!-- handoverkit:id=known-issues hash=8193d09e6bb8 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scanned-sources.test.ts -->
 ### From the issue tracker
 
 _Not fetched. Re-run `handoverkit generate --with-issues` to list open tickets here._
 
 ### TODO/FIXME in source
 
-_None found in the 29 scanned source files._
+_None found in the 31 scanned source files._
 
 <!-- handoverkit:notes:start id=known-issues -->
 _No hand-written notes yet — anything you write between these two markers survives `handoverkit generate`._

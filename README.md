@@ -70,8 +70,17 @@ one on every push.
 
 ## Adding your own sections
 
-Drop a `handoverkit.config.json` at the repo root (or point at one with
-`--config`) to track things the built-in sections know nothing about:
+`handoverkit init` writes a starter config and prints the built-in section ids
+you're allowed to `exclude` or reorder:
+
+```bash
+handoverkit init      # refuses to overwrite an existing config; --force to insist
+```
+
+The file it writes is valid as generated, so the first `generate` after `init`
+works and you edit from there. Or write it yourself — drop a
+`handoverkit.config.json` at the repo root (or point at one with `--config`)
+to track things the built-in sections know nothing about:
 
 ```json
 {
@@ -216,6 +225,7 @@ src/
   marker.ts              the marker embedded in reports, so comments update in place
   core/
     config.ts             parses and validates handoverkit.config.json
+    init.ts                scaffolds a starter config that's valid as written
     generate.ts           builds SERVICE.md from sections
     notes.ts               carries hand-written notes blocks across regeneration
     check.ts               parses SERVICE.md, recomputes hashes, reports drift
