@@ -114,6 +114,9 @@ to track things the built-in sections know nothing about:
   generator can't write.
 - **`exclude`** drops built-in sections; **`order`** pulls ids to the front
   and leaves the rest in place.
+- **`scanLimit`** (default 200) is how many source files `Known Issues` and
+  `Architecture` may read. Raising it widens both, and widens their drift
+  detection with them, at the cost of a longer `sources=` list.
 
 The config file joins the sources of every section it defines, so changing
 which files a section tracks re-baselines it the same way changing those
@@ -272,8 +275,12 @@ in `core/` needs to change — that's the point of the interface boundary.
   third-party paths are still listed but no internal edges are found.
 - Languages other than JavaScript/TypeScript, Python and Go are counted but
   not parsed for imports.
-- `Known Issues` scans TODO/FIXME in at most 200 source files, for speed on
-  large repos.
+- `Known Issues` and `Architecture` read at most `scanLimit` source files (200
+  by default). Files past that are neither read nor covered by those sections'
+  drift checks. The scan is spread across directories rather than taken in walk
+  order, and the sections say plainly how much they left unread — a document
+  reporting "no TODOs found" after reading a fraction of the repo is worse than
+  one that admits the gap.
 - Issues pulled with `--with-issues` are a snapshot: written into the doc but
   not hashed, so the doc can describe a closed ticket until someone
   regenerates. `check --with-issues` reports when that has happened, but as an

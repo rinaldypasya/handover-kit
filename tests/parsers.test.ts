@@ -111,7 +111,9 @@ test("listSourceFiles returns a deterministic, posix-separated listing", async (
 
     const files = await listSourceFiles(root);
 
-    assert.deepEqual(files, ["apple.ts", "zebra.ts", "src/core/hash.ts"]);
+    // Sorted as a whole rather than in walk order: the selection is spread
+    // across directories now, so walk order is no longer the output order.
+    assert.deepEqual(files, ["apple.ts", "src/core/hash.ts", "zebra.ts"]);
     assert.deepEqual(files, await listSourceFiles(root), "repeated walks must agree");
   });
 });

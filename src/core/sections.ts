@@ -2,7 +2,7 @@ import { loadEnvVars, ENV_FILE_CANDIDATES } from "./parsers/env.js";
 import { loadPackageInfo } from "./parsers/packageJson.js";
 import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
 import { detectCi, findTodos, CI_SOURCE_ROOTS, type TodoMarker } from "./parsers/ci.js";
-import { listSourceFiles, directoriesOf } from "./parsers/walk.js";
+import { scanSourceFiles, directoriesOf, type SourceScan } from "./parsers/walk.js";
 import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
 import { CONFIG_FILENAME, EMPTY_CONFIG, type CustomSectionConfig, type HandoverConfig } from "./config.js";
@@ -64,7 +64,8 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   const envVars = await loadEnvVars(repoRoot);
   const ci = await detectCi(repoRoot);
   const owners = await loadCodeowners(repoRoot);
-  const scannedFiles = (await listSourceFiles(repoRoot, TODO_SCAN_LIMIT)).slice(0, TODO_SCAN_LIMIT);
+  const scan = await scanSourceFiles(repoRoot, config.scanLimit ?? TODO_SCAN_LIMIT);
+  const scannedFiles = scan.files;
   // Files catch edits and deletions; the directories they live in catch
   // additions. Without the directories, a file added after `generate` — a new
   // module, a new TODO — is invisible to `check`, because the recorded source
@@ -107,6 +108,8 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
       const table = ["| Directory | Files | Imports from |", "| --- | --- | --- |", ...rows].join("\n");
 
       const parts = [table];
+      const coverage = renderScanCoverage(scan);
+      if (coverage) parts.push(coverage);
       if (graph.packages.length > 0) {
         parts.push(`External packages imported: ${graph.packages.map((p) => `\`${p}\``).join(", ")}.`);
       }
@@ -191,7 +194,10 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
     // into the hash would make `check` depend on a remote system's mood and
     // report drift on a commit that changed nothing.
     sourceFiles: scannedSources,
-    render: async () => [renderTrackerIssues(options.issues), renderTodos(todos, scannedFiles.length)].join("\n\n"),
+    render: async () =>
+      [renderTrackerIssues(options.issues), renderTodos(todos, scannedFiles.length), renderScanCoverage(scan)]
+        .filter(Boolean)
+        .join("\n\n"),
   });
 
   sections.push({
@@ -322,6 +328,23 @@ function renderTodos(todos: TodoMarker[], scannedCount: number): string {
   const rows = todos.slice(0, TODO_RENDER_LIMIT).map((t) => `- \`${t.file}:${t.line}\` — ${t.text}`);
   const rest = todos.length - TODO_RENDER_LIMIT;
   return [heading, "", ...rows, ...(rest > 0 ? ["", `_(${rest} more not shown)_`] : [])].join("\n");
+}
+
+/**
+ * States what the scan didn't read.
+ *
+ * Silence here is the failure: a document that says "no TODOs found" after
+ * reading 200 of 1,240 files has told the reader something false in every way
+ * that matters. Files outside the scan are also outside the section's hash, so
+ * changing one raises no drift either — that gets said too.
+ */
+function renderScanCoverage(scan: SourceScan): string | undefined {
+  if (!scan.truncated) return undefined;
+  const found = scan.discoveryCapped ? `at least ${scan.totalFound.toLocaleString("en-US")}` : scan.totalFound.toLocaleString("en-US");
+  return (
+    `_Scanned ${scan.files.length.toLocaleString("en-US")} of ${found} source files, spread across directories. ` +
+    `The rest are neither read nor covered by this section's drift check — raise \`scanLimit\` in \`${CONFIG_FILENAME}\` to widen it._`
+  );
 }
 
 /** Keeps a title containing brackets from breaking out of its markdown link. */

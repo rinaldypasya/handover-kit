@@ -1,4 +1,5 @@
 import { tryRead } from "./parsers/fsUtil.js";
+import { DISCOVERY_CEILING } from "./parsers/walk.js";
 
 /**
  * Optional per-repo configuration.
@@ -18,7 +19,7 @@ export const CONFIG_FILENAME = "handoverkit.config.json";
 /** Same charset the notes markers accept — an id outside it can't round-trip. */
 const ID_PATTERN = /^[A-Za-z0-9._-]+$/;
 
-const ALLOWED_KEYS = ["sections", "exclude", "order"];
+const ALLOWED_KEYS = ["sections", "exclude", "order", "scanLimit"];
 const ALLOWED_SECTION_KEYS = ["id", "title", "sources", "body"];
 
 export interface CustomSectionConfig {
@@ -36,6 +37,12 @@ export interface HandoverConfig {
   exclude: string[];
   /** Section ids to pull to the front, in this order. Others keep their order. */
   order?: string[];
+  /**
+   * How many source files the scanning sections may read. Raising it widens
+   * both the TODO scan and the dependency graph, at the cost of a longer
+   * `sources=` list in SERVICE.md.
+   */
+  scanLimit?: number;
 }
 
 export const EMPTY_CONFIG: HandoverConfig = { sections: [], exclude: [] };
@@ -67,8 +74,25 @@ export function parseConfig(raw: string, filename = CONFIG_FILENAME): HandoverCo
   const sections = parseSections(parsed.sections, filename);
   const exclude = parseStringArray(parsed.exclude, `${filename}: "exclude"`) ?? [];
   const order = parseStringArray(parsed.order, `${filename}: "order"`);
+  const scanLimit = parseScanLimit(parsed.scanLimit, `${filename}: "scanLimit"`);
 
-  return order ? { sections, exclude, order } : { sections, exclude };
+  return {
+    sections,
+    exclude,
+    ...(order ? { order } : {}),
+    ...(scanLimit !== undefined ? { scanLimit } : {}),
+  };
+}
+
+function parseScanLimit(value: unknown, where: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    throw new Error(`${where} must be a positive whole number.`);
+  }
+  if (value > DISCOVERY_CEILING) {
+    throw new Error(`${where} must be at most ${DISCOVERY_CEILING}, the most files handover-kit will enumerate.`);
+  }
+  return value;
 }
 
 function parseSections(value: unknown, filename: string): CustomSectionConfig[] {
