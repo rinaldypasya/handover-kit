@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -11,6 +11,16 @@ export async function tryRead(repoRoot: string, relativePath: string): Promise<s
     return await readFile(path.resolve(repoRoot, relativePath), "utf8");
   } catch {
     return undefined;
+  }
+}
+
+/** True for files and directories alike — tryRead can't tell "absent" from "is a directory". */
+export async function pathExists(repoRoot: string, relativePath: string): Promise<boolean> {
+  try {
+    await stat(path.resolve(repoRoot, relativePath));
+    return true;
+  } catch {
+    return false;
   }
 }
 

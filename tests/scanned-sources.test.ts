@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { directoriesOf } from "../src/core/parsers/walk.js";
+import { directoriesOf, withAncestors } from "../src/core/parsers/walk.js";
 import { generateServiceMd } from "../src/core/generate.js";
 import { checkServiceMd } from "../src/core/check.js";
 
@@ -30,6 +30,31 @@ test("directoriesOf collects distinct parents and drops the repo root", () => {
   const dirs = directoriesOf(["src/a.ts", "src/b.ts", "src/core/c.ts", "top.ts"]);
 
   assert.deepEqual(dirs, ["src", "src/core"], "the root is excluded on purpose");
+});
+
+test("withAncestors adds the parents, still stopping short of the root", () => {
+  assert.deepEqual(withAncestors(["src/core/parsers"]), ["src", "src/core", "src/core/parsers"]);
+  assert.deepEqual(withAncestors(["src"]), ["src"]);
+  assert.deepEqual(withAncestors([]), []);
+});
+
+test("a new directory under a parent that holds no files of its own is caught", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "handoverkit-nested-"));
+  try {
+    // `src` holds no source files directly, so tracking only the directories
+    // that do would leave a whole new module landing unnoticed.
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "svc" }));
+    await mkdir(path.join(root, "src", "api"), { recursive: true });
+    await writeFile(path.join(root, "src", "api", "index.ts"), "export const a = 1;\n");
+    const doc = await generateServiceMd(root);
+
+    await mkdir(path.join(root, "src", "billing"), { recursive: true });
+    await writeFile(path.join(root, "src", "billing", "index.ts"), "export const b = 1;\n");
+
+    assert.deepEqual(staleScanning(await checkServiceMd(root, doc)), ["architecture", "known-issues"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("adding a source file registers as drift", async () => {

@@ -31,6 +31,29 @@ export function directoriesOf(files: string[]): string[] {
 }
 
 /**
+ * The given directories plus every directory above them, short of the root.
+ *
+ * Tracking only the directories that *directly* hold source files leaves a
+ * hole: in a repo where `src/` contains no files of its own, adding
+ * `src/billing/` changes no tracked listing, so a whole new module lands
+ * unnoticed. Its parent has to be tracked for the addition to register.
+ *
+ * The root stays excluded for the reason above — its listing contains
+ * SERVICE.md, written after hashing.
+ */
+export function withAncestors(directories: string[]): string[] {
+  const all = new Set<string>();
+  for (const directory of directories) {
+    let current = directory;
+    while (current !== "." && current !== "" && current !== "/") {
+      all.add(current);
+      current = path.posix.dirname(current);
+    }
+  }
+  return [...all].sort();
+}
+
+/**
  * Hard ceiling on how many source files the walk will even enumerate.
  *
  * Walking is cheap (readdir only, no file reads), so this sits far above the

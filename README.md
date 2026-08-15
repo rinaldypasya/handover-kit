@@ -176,6 +176,32 @@ read.
 Because it's derived from the same scanned files the hash covers, deleting a
 dependency edge shows up as drift on this section.
 
+## The Ownership section
+
+`Ownership` renders CODEOWNERS, and checks it against the repo it claims to
+describe:
+
+```markdown
+| Path | Owners |
+| --- | --- |
+| `src/api/` | @alice |
+| `src/legacy/` | @carol — ⚠️ _path not found_ |
+
+_1 entry names a path that no longer exists. Remove it, or the table claims an
+owner for nothing._
+
+_No owner listed for: `src/workers`. A table that only shows covered paths
+reads like full coverage._
+```
+
+Both halves matter. An entry pointing at a deleted directory used to render as
+a perfectly ordinary row, and a directory full of code with no owner was simply
+absent — leaving a table that looked complete while telling you nothing about
+the part you'd actually need to ask about.
+
+The paths CODEOWNERS names are tracked as sources, so deleting an owned
+directory raises drift rather than leaving the claim standing.
+
 ## Pulling in open issues
 
 `Known Issues` lists TODO/FIXME markers found in source. It can also list
@@ -306,10 +332,18 @@ in `core/` needs to change — that's the point of the interface boundary.
   regenerates. `check --with-issues` reports when that has happened, but as an
   advisory note only — it deliberately doesn't fail the check.
 - Known Issues and Architecture track the directories holding the files they
-  scanned, but not the repo root — the root listing contains `SERVICE.md`,
-  which `generate` writes after hashing, so tracking it would make every first
-  run report itself as drifted. A new source file added at the top level is
-  therefore picked up on the next `generate` rather than flagged by `check`.
+  scanned, and every directory above those, but not the repo root — the root
+  listing contains `SERVICE.md`, which `generate` writes after hashing, so
+  tracking it would make every first run report itself as drifted. A new source
+  file added at the top level is therefore picked up on the next `generate`
+  rather than flagged by `check`.
+- `Ownership` drifts when a path CODEOWNERS names disappears, but not when a
+  new unowned directory appears — nothing it tracks changed. The scanning
+  sections do drift on that, so the reviewer is still told to regenerate, which
+  refreshes the unowned list.
+- CODEOWNERS glob patterns (`*.ts`, `src/**/api`) aren't matched against the
+  repo. Doing it properly needs a glob engine, and a wrong answer would either
+  accuse a valid entry or hide a real gap, so they're listed as unchecked.
 
 ## License
 

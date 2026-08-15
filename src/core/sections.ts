@@ -1,8 +1,14 @@
 import { loadEnvVars, ENV_FILE_CANDIDATES } from "./parsers/env.js";
 import { loadPackageInfo } from "./parsers/packageJson.js";
-import { loadCodeowners, CODEOWNERS_CANDIDATES } from "./parsers/codeowners.js";
+import {
+  loadCodeowners,
+  auditOwnership,
+  isLiteralPattern,
+  patternToPath,
+  CODEOWNERS_CANDIDATES,
+} from "./parsers/codeowners.js";
 import { detectCi, findTodos, CI_SOURCE_ROOTS, type TodoMarker } from "./parsers/ci.js";
-import { scanSourceFiles, directoriesOf, type SourceScan } from "./parsers/walk.js";
+import { scanSourceFiles, directoriesOf, withAncestors, type SourceScan } from "./parsers/walk.js";
 import { buildModuleGraph } from "./parsers/imports.js";
 import { tryRead } from "./parsers/fsUtil.js";
 import { CONFIG_FILENAME, EMPTY_CONFIG, type CustomSectionConfig, type HandoverConfig } from "./config.js";
@@ -70,12 +76,13 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   // additions. Without the directories, a file added after `generate` — a new
   // module, a new TODO — is invisible to `check`, because the recorded source
   // list was written before that file existed.
-  const scannedSources = [...directoriesOf(scannedFiles), ...scannedFiles].sort();
+  const scannedSources = [...withAncestors(directoriesOf(scannedFiles)), ...scannedFiles].sort();
   const todos = await findTodos(repoRoot, scannedFiles);
   // Only filter against package.json when there is one; a repo without it gives
   // us nothing to verify against, and an unfiltered list beats an empty one.
   const declaredPackages = pkg ? [...pkg.dependencies, ...pkg.devDependencies] : undefined;
   const graph = await buildModuleGraph(repoRoot, scannedFiles, declaredPackages);
+  const audit = await auditOwnership(repoRoot, owners, directoriesOf(scannedFiles));
 
   const sections: Section[] = [];
 
@@ -203,13 +210,45 @@ export async function buildSections(repoRoot: string, options: BuildSectionsOpti
   sections.push({
     id: "ownership",
     title: "Ownership",
-    sourceFiles: CODEOWNERS_CANDIDATES,
+    // The paths CODEOWNERS names are tracked alongside the file itself.
+    // Without them, deleting an owned directory left the table claiming an
+    // owner for something that no longer existed, with no drift raised.
+    sourceFiles: [
+      ...new Set([
+        ...CODEOWNERS_CANDIDATES,
+        ...owners.filter((o) => isLiteralPattern(o.pattern)).map((o) => patternToPath(o.pattern)),
+      ]),
+    ].sort(),
     render: async () => {
       if (owners.length === 0) {
         return "_No CODEOWNERS file found. Add one, or list who to contact for this service manually here._";
       }
-      const rows = owners.map((o) => `| \`${o.pattern}\` | ${o.owners.join(", ")} |`);
-      return ["| Path | Owners |", "| --- | --- |", ...rows].join("\n");
+      const missing = new Set(audit.missing);
+      const rows = owners.map((o) => {
+        const flag = missing.has(patternToPath(o.pattern)) ? " — ⚠️ _path not found_" : "";
+        return `| \`${o.pattern}\` | ${o.owners.join(", ")}${flag} |`;
+      });
+      const parts = [["| Path | Owners |", "| --- | --- |", ...rows].join("\n")];
+
+      if (audit.missing.length > 0) {
+        const n = audit.missing.length;
+        parts.push(
+          n === 1
+            ? "_1 entry names a path that no longer exists. Remove it, or the table claims an owner for nothing._"
+            : `_${n} entries name paths that no longer exist. Remove them, or the table claims an owner for nothing._`
+        );
+      }
+      if (audit.unowned.length > 0) {
+        parts.push(
+          `_No owner listed for: ${audit.unowned.map((d) => `\`${d}\``).join(", ")}. A table that only shows covered paths reads like full coverage._`
+        );
+      }
+      if (audit.unchecked.length > 0) {
+        parts.push(
+          `_Not checked against the repo (matching these needs a glob engine): ${audit.unchecked.map((p) => `\`${p}\``).join(", ")}._`
+        );
+      }
+      return parts.join("\n\n");
     },
   });
 
