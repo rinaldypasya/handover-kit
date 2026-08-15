@@ -1,5 +1,5 @@
 import { buildSections, type KnownIssue } from "./sections.js";
-import { hashFiles } from "./hash.js";
+import { hashFiles, fingerprintSources } from "./hash.js";
 import { extractNotes, isEmptyNotes, renderNotesBlock } from "./notes.js";
 import { loadConfig } from "./config.js";
 
@@ -49,12 +49,16 @@ export async function generateServiceMd(repoRoot: string, options: GenerateOptio
   for (const section of sections) {
     const content = await section.render();
     const hash = await hashFiles(repoRoot, section.sourceFiles);
+    // Positionally aligned with sources. Costs a few hundred invisible
+    // characters and buys a report that names the file that actually moved
+    // instead of the first few alphabetically.
+    const digests = await fingerprintSources(repoRoot, section.sourceFiles);
     const notes = carried.get(section.id) ?? "";
     carried.delete(section.id);
 
     blocks.push(
       `## ${section.title}\n` +
-        `<!-- handoverkit:id=${section.id} hash=${hash} sources=${section.sourceFiles.join(",")} -->\n` +
+        `<!-- handoverkit:id=${section.id} hash=${hash} sources=${section.sourceFiles.join(",")} digests=${digests.join(",")} -->\n` +
         `${content}\n\n` +
         `${renderNotesBlock(section.id, notes)}\n`
     );

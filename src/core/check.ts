@@ -1,6 +1,14 @@
-import { hashFiles } from "./hash.js";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
+import { hashFiles, fingerprintSource } from "./hash.js";
 import { REPORT_MARKER } from "../marker.js";
 import type { KnownIssue } from "./sections.js";
+
+export interface SourceChange {
+  path: string;
+  /** `added` is attributed to the directory that now contains the file. */
+  kind: "changed" | "removed" | "added";
+}
 
 export interface DriftResult {
   id: string;
@@ -9,13 +17,18 @@ export interface DriftResult {
   storedHash: string;
   currentHash: string;
   stale: boolean;
+  /**
+   * Which sources moved. Empty when nothing did; undefined when the document
+   * predates per-source digests and the question can't be answered.
+   */
+  changes?: SourceChange[];
 }
 
 // `\r?\n` so a SERVICE.md checked out with CRLF line endings (Windows, or
 // git's autocrlf) still parses — otherwise every section silently vanishes
 // from the report and `check` reports "up to date" on a file it never read.
 const METADATA_RE =
-  /^##[ \t]+(.+?)[ \t]*\r?\n<!--\s*handoverkit:id=(\S+)\s+hash=(\S+)\s+sources=(\S*)\s*-->/gm;
+  /^##[ \t]+(.+?)[ \t]*\r?\n<!--\s*handoverkit:id=(\S+)\s+hash=(\S+)\s+sources=(\S*?)(?:\s+digests=(\S*))?\s*-->/gm;
 
 /**
  * Parses an existing SERVICE.md, recomputes each section's hash from its
@@ -31,20 +44,79 @@ export async function checkServiceMd(repoRoot: string, serviceMdContent: string)
   const matches = serviceMdContent.matchAll(METADATA_RE);
 
   for (const match of matches) {
-    const [, title, id, storedHash, sourcesRaw] = match;
+    const [, title, id, storedHash, sourcesRaw, digestsRaw] = match;
     const sources = sourcesRaw ? sourcesRaw.split(",").filter(Boolean) : [];
+    const storedDigests = digestsRaw === undefined ? undefined : digestsRaw.split(",").filter(Boolean);
     const currentHash = await hashFiles(repoRoot, sources);
+    const stale = storedHash !== currentHash;
+
     results.push({
       id,
       title: title.trim(),
       sources,
       storedHash,
       currentHash,
-      stale: storedHash !== currentHash,
+      stale,
+      changes: stale ? await locateChanges(repoRoot, sources, storedDigests) : undefined,
     });
   }
 
   return results;
+}
+
+/**
+ * Attributes a section's drift to individual sources.
+ *
+ * Returns undefined when the document carries no digests — an older SERVICE.md,
+ * or one whose digest count no longer lines up with its source list. Guessing
+ * from a mismatched pair would name innocent files, which is the failure this
+ * exists to fix.
+ */
+async function locateChanges(
+  repoRoot: string,
+  sources: string[],
+  storedDigests: string[] | undefined
+): Promise<SourceChange[] | undefined> {
+  if (!storedDigests || storedDigests.length !== sources.length) return undefined;
+
+  const changes: SourceChange[] = [];
+  const tracked = new Set(sources);
+
+  for (const [index, source] of sources.entries()) {
+    const current = await fingerprintSource(repoRoot, source);
+    if (current.digest === storedDigests[index]) continue;
+
+    if (current.kind === "missing") {
+      changes.push({ path: source, kind: "removed" });
+      continue;
+    }
+    if (current.kind === "directory") {
+      // A directory's digest is its listing, so it moved because an entry
+      // appeared or vanished. Naming the directory is less useful than naming
+      // the file, and the file list already tells us which entries are known.
+      changes.push(...(await newEntriesIn(repoRoot, source, tracked)));
+      continue;
+    }
+    changes.push({ path: source, kind: "changed" });
+  }
+
+  return changes;
+}
+
+/** Files sitting in a tracked directory that the recorded source list doesn't know about. */
+async function newEntriesIn(repoRoot: string, directory: string, tracked: Set<string>): Promise<SourceChange[]> {
+  let entries;
+  try {
+    entries = await readdir(path.resolve(repoRoot, directory), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => `${directory}/${entry.name}`)
+    .filter((candidate) => !tracked.has(candidate))
+    .sort()
+    .map((candidate) => ({ path: candidate, kind: "added" as const }));
 }
 
 export function formatDriftReport(results: DriftResult[]): string {
@@ -70,7 +142,8 @@ export function formatDriftReport(results: DriftResult[]): string {
     "",
   ];
   for (const r of stale) {
-    lines.push(`- **${r.title}** — depends on ${summarizeSources(r.sources)}`);
+    lines.push(`- **${r.title}** — ${describeChanges(r)}`);
+    lines.push(...detailLines(r));
   }
   lines.push(
     "",
@@ -138,9 +211,47 @@ export function formatIssueNote(comparison: IssueComparison): string {
   return lines.join("\n");
 }
 
+const KIND_LABELS: Record<SourceChange["kind"], string> = {
+  changed: "changed",
+  added: "added",
+  removed: "removed",
+};
+
+/** A one-line count, e.g. "1 file changed, 1 added, 1 removed". */
+function describeChanges(result: DriftResult): string {
+  if (result.changes === undefined) {
+    // Pre-digest document: say what we can, and don't imply the listed files
+    // are the ones that moved.
+    return `depends on ${summarizeSources(result.sources)} — regenerate to record which file changed`;
+  }
+  if (result.changes.length === 0) {
+    return "its sources moved, but no individual source could be attributed";
+  }
+  const counts = (["changed", "added", "removed"] as const)
+    .map((kind) => ({ kind, n: result.changes!.filter((c) => c.kind === kind).length }))
+    .filter(({ n }) => n > 0)
+    .map(({ kind, n }, index) => (index === 0 ? `${n} file${n === 1 ? "" : "s"} ${KIND_LABELS[kind]}` : `${n} ${KIND_LABELS[kind]}`));
+  return counts.join(", ");
+}
+
+/** The paths themselves, indented under the section, capped per category. */
+function detailLines(result: DriftResult, limit = 5): string[] {
+  if (!result.changes || result.changes.length === 0) return [];
+  const lines: string[] = [];
+  for (const kind of ["changed", "added", "removed"] as const) {
+    const matching = result.changes.filter((c) => c.kind === kind);
+    if (matching.length === 0) continue;
+    const shown = matching.slice(0, limit).map((c) => `\`${c.path}\``).join(", ");
+    const rest = matching.length - limit;
+    lines.push(`  - ${KIND_LABELS[kind]}: ${shown}${rest > 0 ? ` _(+${rest} more)_` : ""}`);
+  }
+  return lines;
+}
+
 /**
- * Sections like Known Issues can depend on hundreds of files; listing them all
- * turns the PR comment into a wall of paths. Show a few, count the rest.
+ * Fallback for documents with no recorded digests. Listing the first few
+ * sources is only ever a hint about what the section covers — it is not a
+ * claim that those files moved.
  */
 function summarizeSources(sources: string[], limit = 5): string {
   if (sources.length === 0) return "_(no source files recorded)_";

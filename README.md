@@ -46,7 +46,7 @@ hash of the files it was generated from:
 
 ```markdown
 ## Environment & Config
-<!-- handoverkit:id=environment hash=3f9a21c40b1e sources=.env.example -->
+<!-- handoverkit:id=environment hash=3f9a21c40b1e sources=.env.example digests=897f6195 -->
 | Variable | Default | Notes |
 ...
 ```
@@ -55,6 +55,26 @@ hash of the files it was generated from:
 compares it to what's stored. If they differ, that section is stale. This
 is deliberately not LLM-based — it's a plain hash comparison, so there are
 no false positives from a model "deciding" something looks fine.
+
+`digests=` records one short hash per source, aligned with `sources=`. The
+section hash answers *whether* something moved; only per-source digests can
+answer *which*. Without them the report fell back to naming the first few
+sources alphabetically — usually not the ones that changed — so `check` now
+reports the file:
+
+```
+- **Architecture** — 1 file changed, 1 added, 1 removed
+  - changed: `core/f3.ts`
+  - added: `workers/queue.ts`
+  - removed: `api/f7.ts`
+```
+
+Additions are attributed through the directory that now holds the file, which
+is why directory sources earn their place. A document generated before digests
+existed still detects drift exactly as before; it just says to regenerate to
+get the detail. A digest list that doesn't line up with its sources is ignored
+rather than guessed at — misaligned digests would name innocent files, which is
+the failure this exists to fix.
 
 A missing file hashes to a fixed sentinel rather than being skipped, so
 "the file used to exist and now doesn't" also counts as drift. Paths are

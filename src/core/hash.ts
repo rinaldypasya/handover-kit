@@ -33,6 +33,34 @@ export async function hashFiles(repoRoot: string, relativePaths: string[]): Prom
   return hash.digest("hex").slice(0, 12);
 }
 
+export type SourceKind = "file" | "directory" | "missing";
+
+export interface SourceFingerprint {
+  digest: string;
+  kind: SourceKind;
+}
+
+/**
+ * Per-source digest, recorded alongside the section hash.
+ *
+ * The section hash alone can only answer "did anything change". Given one
+ * combined value there is no way to attribute a difference to a file, so the
+ * report used to name the first few sources alphabetically — which are usually
+ * not the ones that moved. Recording a digest per source is what lets `check`
+ * say which file it was.
+ */
+export async function fingerprintSource(repoRoot: string, relativePath: string): Promise<SourceFingerprint> {
+  const content = await fingerprint(path.resolve(repoRoot, relativePath));
+  const digest = createHash("sha256").update(relativePath).update(content).digest("hex").slice(0, 8);
+
+  if (content === MISSING) return { digest, kind: "missing" };
+  return { digest, kind: typeof content === "string" && content.startsWith(DIRECTORY) ? "directory" : "file" };
+}
+
+export async function fingerprintSources(repoRoot: string, relativePaths: string[]): Promise<string[]> {
+  return Promise.all(relativePaths.map(async (rel) => (await fingerprintSource(repoRoot, rel)).digest));
+}
+
 /**
  * A file contributes its contents; a directory contributes its sorted entry
  * names.

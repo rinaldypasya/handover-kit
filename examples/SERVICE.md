@@ -10,7 +10,7 @@
 # Service Handover Doc
 
 ## Overview
-<!-- handoverkit:id=overview hash=1436eab6e860 sources=README.md,package.json -->
+<!-- handoverkit:id=overview hash=e627d4c4781f sources=README.md,package.json digests=84812f0f,5f05cf74 -->
 **handover-kit**
 
 Keep service documentation alive across handovers: generate a living SERVICE.md and flag it when code changes but the docs don't.
@@ -22,14 +22,14 @@ so it doubles as the fixture we notice regressions in.
 <!-- handoverkit:notes:end id=overview -->
 
 ## Architecture
-<!-- handoverkit:id=architecture hash=bf8212e13f61 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scan-limit.test.ts,tests/scanned-sources.test.ts -->
+<!-- handoverkit:id=architecture hash=644e19a75631 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/change-attribution.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scan-limit.test.ts,tests/scanned-sources.test.ts digests=6cc02633,dc2de487,372c0e41,79354bfc,a21bd449,b88dc155,c332b0b1,81f73b47,dcb33e9d,a52abe68,10787545,33a77177,62e43d55,660943c5,c44a572f,4d6c9a8b,01ce2982,0acc1fd3,ff5b5cb2,69024fe1,7edbb7d9,4343f34d,79272cd6,06da2875,c8c8efef,c40a62ad,84a8eda1,dbb3d3ad,17ec740f,d65bcac9,3c0cf16a,925662bc,f887ea18,edffc4b8,8b7a6047,2a6372d1,a0dcfba3,548447ad -->
 | Directory | Files | Imports from |
 | --- | --- | --- |
 | `src` | 2 | `src/core`, `src/core/parsers`, `src/providers` |
 | `src/core` | 7 | `src`, `src/core/parsers` |
 | `src/core/parsers` | 7 | _(nothing internal)_ |
 | `src/providers` | 3 | `src` |
-| `tests` | 13 | `src`, `src/core`, `src/core/parsers` |
+| `tests` | 14 | `src`, `src/core`, `src/core/parsers` |
 
 External packages imported: `commander`.
 
@@ -38,7 +38,7 @@ _No hand-written notes yet — anything you write between these two markers surv
 <!-- handoverkit:notes:end id=architecture -->
 
 ## Environment & Config
-<!-- handoverkit:id=environment hash=b24364742d39 sources=.env.example,.env.sample,.env.template -->
+<!-- handoverkit:id=environment hash=b24364742d39 sources=.env.example,.env.sample,.env.template digests=897f6195,11c8e9f5,2a3d4310 -->
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `PORT` | `3000` | Port the HTTP server listens on |
@@ -53,7 +53,7 @@ Postgres or Redis this table implies.
 <!-- handoverkit:notes:end id=environment -->
 
 ## Local Setup
-<!-- handoverkit:id=local-setup hash=5f05cf748238 sources=package.json -->
+<!-- handoverkit:id=local-setup hash=5f05cf748238 sources=package.json digests=5f05cf74 -->
 | Command | Runs |
 | --- | --- |
 | `npm run build` | `tsc -p tsconfig.json` |
@@ -75,7 +75,7 @@ passes locally it passes there.
 <!-- handoverkit:notes:end id=local-setup -->
 
 ## Deployment
-<!-- handoverkit:id=deployment hash=3622480b32b7 sources=.github/workflows,.github/workflows/handover-check.yml,.gitlab-ci.yml -->
+<!-- handoverkit:id=deployment hash=3622480b32b7 sources=.github/workflows,.github/workflows/handover-check.yml,.gitlab-ci.yml digests=4ef04e33,301926ff,c4abb96f -->
 Deployment is driven by more than one pipeline:
 
 - **GitHub Actions** — `.github/workflows/handover-check.yml`
@@ -86,21 +86,21 @@ _No hand-written notes yet — anything you write between these two markers surv
 <!-- handoverkit:notes:end id=deployment -->
 
 ## Known Issues
-<!-- handoverkit:id=known-issues hash=bf8212e13f61 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scan-limit.test.ts,tests/scanned-sources.test.ts -->
+<!-- handoverkit:id=known-issues hash=644e19a75631 sources=src,src/cli.ts,src/core,src/core/check.ts,src/core/config.ts,src/core/generate.ts,src/core/hash.ts,src/core/init.ts,src/core/notes.ts,src/core/parsers,src/core/parsers/ci.ts,src/core/parsers/codeowners.ts,src/core/parsers/env.ts,src/core/parsers/fsUtil.ts,src/core/parsers/imports.ts,src/core/parsers/packageJson.ts,src/core/parsers/walk.ts,src/core/sections.ts,src/marker.ts,src/providers,src/providers/GithubProvider.ts,src/providers/GitlabProvider.ts,src/providers/VcsProvider.ts,tests,tests/architecture.test.ts,tests/change-attribution.test.ts,tests/config.test.ts,tests/deployment.test.ts,tests/hash.test.ts,tests/init.test.ts,tests/issue-drift.test.ts,tests/issues.test.ts,tests/languages.test.ts,tests/notes.test.ts,tests/parsers.test.ts,tests/roundtrip.test.ts,tests/scan-limit.test.ts,tests/scanned-sources.test.ts digests=6cc02633,dc2de487,372c0e41,79354bfc,a21bd449,b88dc155,c332b0b1,81f73b47,dcb33e9d,a52abe68,10787545,33a77177,62e43d55,660943c5,c44a572f,4d6c9a8b,01ce2982,0acc1fd3,ff5b5cb2,69024fe1,7edbb7d9,4343f34d,79272cd6,06da2875,c8c8efef,c40a62ad,84a8eda1,dbb3d3ad,17ec740f,d65bcac9,3c0cf16a,925662bc,f887ea18,edffc4b8,8b7a6047,2a6372d1,a0dcfba3,548447ad -->
 ### From the issue tracker
 
 _Not fetched. Re-run `handoverkit generate --with-issues` to list open tickets here._
 
 ### TODO/FIXME in source
 
-_None found in the 32 scanned source files._
+_None found in the 33 scanned source files._
 
 <!-- handoverkit:notes:start id=known-issues -->
 _No hand-written notes yet — anything you write between these two markers survives `handoverkit generate`._
 <!-- handoverkit:notes:end id=known-issues -->
 
 ## Ownership
-<!-- handoverkit:id=ownership hash=b37c9dde2f9d sources=CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS -->
+<!-- handoverkit:id=ownership hash=b37c9dde2f9d sources=CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS digests=473d344e,43b56864,5c536b6d -->
 | Path | Owners |
 | --- | --- |
 | `src/providers/` | @rinaldy-pasya |
